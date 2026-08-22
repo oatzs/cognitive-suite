@@ -158,6 +158,8 @@ describe('Digit generation', () => {
   });
 
   it('generates multiple digits over time', async () => {
+    let generatedDigit = 0;
+    vi.spyOn(Math, 'random').mockImplementation(() => ((generatedDigit++ % 9) + 0.1) / 9);
     const e = createEngine(makeSettings({ startingInterval: 100 }));
     await startEngine(e);
 
