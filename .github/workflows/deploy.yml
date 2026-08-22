@@ -10,7 +10,7 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     env:
-      BASE_PATH: quad-box
+      BASE_PATH: /${{ github.event.repository.name }}/
 
     steps:
       - name: Checkout repo
