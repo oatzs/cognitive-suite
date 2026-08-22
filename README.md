@@ -3,9 +3,11 @@ N-Back and Cognitive Control Training are mindbuilding activites that with many 
 
 I put together my favorite n-back and CCT training websites into one executable so I can play it offline and not rely on browser storage. It also has a separate statistics page like Brain Workshop's.
 
-It's also available on this github page though if you want to try it out!
+If you want to try it out online:
 
 https://oatzs.github.io/cognitive-suite/
+
+Check out the mindbuilding discord, a great resource: discord.gg/brain
 
 Thank you to the original contributors. Check them out here. 
 
@@ -19,7 +21,7 @@ https://github.com/SafEight/docct
 
 ![Two months of example cognitive training statistics](docs/statistics-preview.png)
 
-_Statistics shown with synthetic example training data._
+_Statistics are shown with example training data._
 
 ## Quad Box
 
