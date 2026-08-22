@@ -28,7 +28,7 @@ https://github.com/SafEight/docct
 
 ![Two months of example cognitive training statistics](docs/statistics-preview.png)
 
-_Statistics are shown with example training data._
+_Statistics are shown with example training data. Unfortunately, mindbuilding progress is rarely this straightforward!_
 
 
 ## Downloads
