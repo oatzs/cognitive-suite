@@ -15,11 +15,18 @@ https://github.com/soamsy/quad-box
 **CCT:** https://docct-cn5.pages.dev/
 https://github.com/SafEight/docct
 
+## Progress tracking
+
+![Two months of example cognitive training statistics](docs/statistics-preview.png)
+
+_Statistics shown with synthetic example training data._
+
+## Quad Box
+
 ![3D Quad N-back](3d-quad.jpg)
 
 # Downloads
 Click the Releases button on the right.
-
 
 ## Development
 
