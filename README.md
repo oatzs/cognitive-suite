@@ -7,7 +7,7 @@ If you want to try it out online:
 
 https://oatzs.github.io/cognitive-suite/
 
-Check out the mindbuilding discord, a great resource: discord.gg/brain
+Check out the mindbuilding discord, a great resource: https://discord.gg/brain
 
 Thank you to the original contributors. Check them out here. 
 
