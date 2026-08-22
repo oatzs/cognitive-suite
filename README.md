@@ -11,10 +11,14 @@ Check out the mindbuilding discord, a great resource: discord.gg/brain
 
 Thank you to the original contributors. Check them out here. 
 
-**QuadBox:** https://quad-box.netlify.app.
+**QuadBox:** 
+https://quad-box.netlify.app.
+
 https://github.com/soamsy/quad-box
 
-**CCT:** https://docct-cn5.pages.dev/
+**CCT:** 
+https://docct-cn5.pages.dev/
+
 https://github.com/SafEight/docct
 
 ## Progress tracking
