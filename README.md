@@ -1,7 +1,7 @@
 # Cognitive Suite
 N-Back and Cognitive Control Training are mindbuilding activites that with many hours of dedicated practice can improve your executive functioning, working memory, concentration, and arguably intelligence.
 
-I put together my favorite n-back and CCT training websites into one executable so I can play it offline and not rely on browser storage. It also has a separate statistics page like Brain Workshop's.
+I put together my favorite n-back and CCT training websites into one application. The desktop app works offline and stores settings and training history locally on that device. It also has a separate statistics page like Brain Workshop's.
 
 If you want to try it out online:
 
@@ -33,10 +33,21 @@ _Statistics are shown with example training data._
 
 ## Downloads
 
-Desktop packaging uses Electron and Electron Builder. Use Node.js 22.12 or
-newer for release builds.
+[Download the latest Cognitive Suite release](https://github.com/oatzs/cognitive-suite/releases/latest).
+Node.js and npm are not required to use these downloads.
 
-https://github.com/oatzs/cognitive-suite/releases
+- **Windows x64:** download the portable `.exe` and run it directly.
+- **macOS Apple Silicon:** download the `arm64.dmg`, open it, and drag the app to Applications.
+- **macOS Intel:** download the `x64.dmg`, open it, and drag the app to Applications.
+- **Linux x64:** download the `.AppImage`, mark it executable, and run it.
+
+Windows and macOS builds are currently unsigned, so the operating system may
+show a security warning on first launch.
+
+## Build from source
+
+Desktop packaging uses Electron and Electron Builder. Release builds require
+Node.js 22.12 or newer.
 
 ```
 npm ci
@@ -51,6 +62,10 @@ Artifacts are written to `release/`:
 
 Native artifacts must be built on their matching operating system. The
 `desktop-release.yml` workflow builds all supported platforms when run
-manually or when a `v*` tag is pushed. Windows and macOS artifacts are unsigned
-until signing credentials are configured, so the operating system may show a
-security warning.
+manually or when a `v*` tag is pushed.
+
+## License
+
+Original contributions to Cognitive Suite are released under the Unlicense.
+The incorporated Quad Box and DocCT code remains subject to their MIT license
+notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
