@@ -1,11 +1,19 @@
-# Quad Box Cognitive Suite
+# Cognitive Suite
 
-One application containing the Quad Box 3D n-back trainer, DocCT cognitive
-control training, and shared Brain Workshop-style statistics.
+I put together my favorite n-back and CCT training websites into one executable so I can play it offline and not rely on browser storage. It also has a separate statistics page like Brain Workshop's.
+
+It's also available on this github page though if you want to try it out!
+https://oatzs.github.io/cognitive-suite/
+
+
+Thank you to the original contributors. Check them out here. 
+**QuadBox:** https://quad-box.netlify.app.
+https://github.com/soamsy/quad-box
+**CCT:** https://docct-cn5.pages.dev/
+https://github.com/SafEight/docct
 
 ![3D Quad N-back](3d-quad.jpg)
 
-The web version remains available at https://quad-box.netlify.app.
 
 ## Development
 
