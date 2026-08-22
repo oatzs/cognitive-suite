@@ -1,6 +1,6 @@
 import { getGameDay, getTruncatedDate } from "./utils"
 const DB_NAME = "QuadBoxNBack"
-const DB_VERSION = 1
+const DB_VERSION = 2
 const STORE_NAME = "games"
 
 const openDB = () => {
@@ -9,14 +9,27 @@ const openDB = () => {
 
     request.onupgradeneeded = (event) => {
       const db = event.target.result
+      let store
       if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, {
+        store = db.createObjectStore(STORE_NAME, {
           keyPath: "id",
           autoIncrement: true,
         })
+      } else {
+        store = request.transaction.objectStore(STORE_NAME)
+      }
+
+      if (!store.indexNames.contains("status")) {
         store.createIndex("status", "status")
+      }
+      if (!store.indexNames.contains("timestamp")) {
         store.createIndex("timestamp", "timestamp")
+      }
+      if (!store.indexNames.contains("status_timestamp")) {
         store.createIndex("status_timestamp", ["status", "timestamp"])
+      }
+      if (!store.indexNames.contains("source_session")) {
+        store.createIndex("source_session", ["source", "sourceSessionId"], { unique: true })
       }
     }
 
@@ -27,11 +40,77 @@ const openDB = () => {
 
 export async function addGame(gameInfo) {
   const db = await openDB()
-  const tx = db.transaction(STORE_NAME, "readwrite")
-  const store = tx.objectStore(STORE_NAME)
-  await store.add(gameInfo)
-  await tx.complete
-  db.close()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite")
+    tx.objectStore(STORE_NAME).add(gameInfo)
+    tx.oncomplete = () => {
+      db.close()
+      resolve()
+    }
+    tx.onerror = () => {
+      db.close()
+      reject(tx.error)
+    }
+    tx.onabort = () => {
+      db.close()
+      reject(tx.error)
+    }
+  })
+}
+
+export async function addDocctSession(session) {
+  const completedAt = new Date(session.completedAt)
+  if (!Number.isFinite(completedAt.getTime())) return false
+
+  const completedTrials = Math.max(0, Number(session.totalAnswers) || 0)
+  const hits = Math.max(0, Number(session.correctCount) || 0)
+  const misses = Math.max(0, completedTrials - hits)
+  const durationSec = Math.max(0, Number(session.durationSec) || 0)
+  const nBack = session.mode === '2-back' ? 2 : session.mode === 'variable' ? 1.5 : 1
+  const timestamp = completedAt.getTime()
+  const record = {
+    source: 'docct',
+    sourceSessionId: session.completedAt,
+    timestamp,
+    start: timestamp - durationSec * 1000,
+    status: 'completed',
+    title: `docct ${session.mode}`,
+    mode: 'docct',
+    variant: session.mode,
+    nBack,
+    tags: ['answer'],
+    scores: { answer: { hits, misses } },
+    completedTrials,
+    trialTime: Number(session.endingIntervalMs) || 0,
+    docct: { ...session },
+  }
+
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite")
+    const store = tx.objectStore(STORE_NAME)
+    const existing = store.index("source_session").getKey(['docct', session.completedAt])
+    let added = false
+
+    existing.onsuccess = () => {
+      if (existing.result === undefined) {
+        store.add(record)
+        added = true
+      }
+    }
+    tx.oncomplete = () => {
+      db.close()
+      resolve(added)
+    }
+    tx.onerror = () => {
+      db.close()
+      reject(tx.error)
+    }
+    tx.onabort = () => {
+      db.close()
+      reject(tx.error)
+    }
+  })
 }
 
 export async function getLastRecentGame() {
@@ -225,6 +304,8 @@ const addScoreMetadata = (game) => {
   if (game.status === 'tombstone') {
     return game
   }
+  game.source = game.source || 'quad-box'
+  game.variant = game.variant || game.title || game.mode || 'unknown'
   if ('start' in game) {
     game.elapsedSeconds = (game.timestamp - game.start) / 1000
   } else {
@@ -241,7 +322,8 @@ const addScoreMetadata = (game) => {
       game.total.percent = game.scores.tally.hits / game.scores.tally.possible
     }
   } else {
-    for (const tag of game.tags) {
+    for (const tag of game.tags || []) {
+      if (!game.scores?.[tag]) continue
       game.total.hits += game.scores[tag].hits
       game.total.misses += game.scores[tag].misses
       game.scores[tag].possible = game.scores[tag].hits + game.scores[tag].misses
@@ -257,7 +339,7 @@ const addScoreMetadata = (game) => {
     game.total.percent = game.total.hits / game.total.possible
   }
 
-  if (game.total.percent >= 0.4 && game?.mode !== 'tally') {
+  if (Number.isFinite(game.nBack) && game?.mode !== 'tally') {
     game.ncalc = game.nBack + (game.total.percent - 0.5) * 2.7
   }
 

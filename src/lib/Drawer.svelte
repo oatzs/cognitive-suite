@@ -64,7 +64,7 @@ onMount(() => {
 
 </script>
 
-<div class="relative flex flex-col h-svh overflow-hidden">
+<div class="relative flex h-full min-h-0 flex-col overflow-hidden">
   <div class="w-full h-16 lg:h-10 grid grid-cols-3 items-center bg-base-200 border-b-1 py-1 text-lg"
   class:text-2xl={$mobile}
   class:grid-cols-[1fr_3fr_1fr]={$mobile}
@@ -111,7 +111,7 @@ onMount(() => {
     </div>
   </div>
 
-  <div class="flex-auto flex relative overflow-x-hidden w-fit duration-0">
+  <div class="relative flex min-h-0 min-w-0 w-full flex-auto overflow-x-hidden duration-0">
     <nav
       bind:this={drawerRef}
       class="absolute top-0 left-0 h-full overflow-y-auto w-86 sm:w-80 bg-base-200 border-r-1 shadow-lg transform transition-transform duration-150 z-50"
@@ -176,7 +176,7 @@ onMount(() => {
       <div class="my-10"></div>
     </nav>
 
-    <div class="relative w-screen h-full transition-transform duration-150 dark:bg-[#232323] bg-[#FBFBFB]">
+    <div class="relative h-full w-full transition-transform duration-150 dark:bg-[#232323] bg-[#FBFBFB]">
       <slot />
     </div>
   </div>

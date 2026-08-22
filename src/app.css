@@ -45,6 +45,25 @@ body {
   min-height: 100svh;
 }
 
+.docct-app {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1;
+}
+
+.docct-app span {
+  line-height: 1;
+}
+
+.docct-app .streak-bar {
+  flex-grow: 1;
+  transition-duration: 0.1s;
+}
+
+.docct-app :where(button, a, input):focus-visible {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+}
+
 @utility game-button {
   @apply btn light:btn-soft btn-accent opacity-90 light:hover:bg-base-200 light:hover:text-neutral-950 duration-0;
 }
