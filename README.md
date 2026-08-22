@@ -23,30 +23,13 @@ https://github.com/SafEight/docct
 
 _Statistics are shown with example training data._
 
-## Quad Box
 
-![3D Quad N-back](3d-quad.jpg)
-
-# Downloads
-Click the Releases button on the right.
-
-## Development
-
-```
-npm ci
-npm run dev
-```
-
-## Tests
-
-```
-npm test
-```
-
-## Desktop builds
+## Downloads
 
 Desktop packaging uses Electron and Electron Builder. Use Node.js 22.12 or
 newer for release builds.
+
+https://github.com/oatzs/cognitive-suite/releases
 
 ```
 npm ci
@@ -64,14 +47,3 @@ Native artifacts must be built on their matching operating system. The
 manually or when a `v*` tag is pushed. Windows and macOS artifacts are unsigned
 until signing credentials are configured, so the operating system may show a
 security warning.
-
-## Shape pool
-
-To view available shapes:
-
-```
-npm run view-shapes
-```
-
-DocCT is included under the MIT License. See `THIRD_PARTY_NOTICES.md` for
-attribution.
