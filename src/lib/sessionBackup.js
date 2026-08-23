@@ -107,15 +107,20 @@ export function toPortableSession(game) {
     tags,
     scores: sanitizeScores(game.scores),
     completedTrials: finiteNumber(game.completedTrials, 'completed trials', { min: 0 }),
-    trialTime: finiteNumber(game.trialTime, 'trial time', { min: 0 }),
   }
 
   const sessionId = optionalString(game.sessionId, 'session ID')
   const sourceSessionId = optionalString(game.sourceSessionId, 'source session ID')
   if (sessionId) sanitized.sessionId = sessionId
   if (sourceSessionId) sanitized.sourceSessionId = sourceSessionId
+  if (game.trialTime !== undefined) {
+    sanitized.trialTime = finiteNumber(game.trialTime, 'trial time', { min: 0 })
+  }
   if (game.start !== undefined) {
     sanitized.start = finiteNumber(game.start, 'session start', { min: 1 })
+  }
+  if (sanitized.trialTime === undefined && sanitized.start === undefined) {
+    throw new SessionBackupError('Session requires trial time or start time')
   }
 
   const docct = sanitizeDocct(game.docct)

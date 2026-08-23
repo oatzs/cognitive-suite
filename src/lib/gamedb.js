@@ -1,12 +1,8 @@
 import { getGameDay, getTruncatedDate } from "./utils"
+import { createSessionId } from "./sessionId"
 const DB_NAME = "QuadBoxNBack"
 const DB_VERSION = 3
 const STORE_NAME = "games"
-
-const createSessionId = () => {
-  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
-}
 
 const openDB = () => {
   return new Promise((resolve, reject) => {

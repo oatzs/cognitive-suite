@@ -32,8 +32,7 @@
   let metric = 'accuracy'
   let importInput
   let importing = false
-  let importMessage = ''
-  let importError = ''
+  let transferNotice = null
 
   const brainWorkshopMetrics = ['adjusted', 'n', 'accuracy', 'nAccuracy', 'weightedAccuracy']
   const docctMetrics = [...brainWorkshopMetrics, 'fastestInterval', 'responseTime']
@@ -92,12 +91,15 @@
   }
 
   async function exportJson() {
-    importError = ''
+    transferNotice = null
     try {
       const payload = await exportSessionHistoryBackup()
       download('cognitive-suite-backup.json', payload, 'application/json')
     } catch (reason) {
-      importError = reason?.message || 'The backup could not be exported.'
+      transferNotice = {
+        kind: 'error',
+        message: reason?.message || 'The backup could not be exported.',
+      }
     }
   }
 
@@ -112,19 +114,24 @@
     if (!file) return
 
     importing = true
-    importMessage = ''
-    importError = ''
+    transferNotice = null
     try {
       if (file.size > MAX_BACKUP_CHARACTERS) {
         throw new Error('Backup files must be 25 MB or smaller.')
       }
       const report = await importSessionHistoryBackup(await file.text())
       await load()
-      importMessage = report.added > 0
-        ? `Imported ${report.added} session${report.added === 1 ? '' : 's'}; skipped ${report.duplicates} duplicate${report.duplicates === 1 ? '' : 's'}. ${report.total} total sessions.`
-        : `No new sessions found; skipped ${report.duplicates} duplicate${report.duplicates === 1 ? '' : 's'}. ${report.total} total sessions.`
+      transferNotice = {
+        kind: 'success',
+        message: report.added > 0
+          ? `Imported ${report.added} session${report.added === 1 ? '' : 's'}; skipped ${report.duplicates} duplicate${report.duplicates === 1 ? '' : 's'}. ${report.total} total sessions.`
+          : `No new sessions found; skipped ${report.duplicates} duplicate${report.duplicates === 1 ? '' : 's'}. ${report.total} total sessions.`,
+      }
     } catch (reason) {
-      importError = `${reason?.message || 'The backup could not be imported.'} No sessions were changed.`
+      transferNotice = {
+        kind: 'error',
+        message: `${reason?.message || 'The backup could not be imported.'} No sessions were changed.`,
+      }
     } finally {
       importing = false
     }
@@ -324,13 +331,13 @@
           </div>
         </div>
 
-        {#if importMessage}
+        {#if transferNotice?.kind === 'success'}
           <div class="mb-4 border-l-4 border-success bg-success/10 px-4 py-3 text-sm" role="status" aria-live="polite">
-            {importMessage}
+            {transferNotice.message}
           </div>
-        {:else if importError}
+        {:else if transferNotice?.kind === 'error'}
           <div class="mb-4 border-l-4 border-error bg-error/10 px-4 py-3 text-sm" role="alert">
-            {importError}
+            {transferNotice.message}
           </div>
         {/if}
 

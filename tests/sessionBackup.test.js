@@ -55,6 +55,28 @@ describe('session backup codec', () => {
     ), { numRuns: 100 })
   })
 
+  it('round-trips tally sessions that use start time instead of trial time', () => {
+    const tally = {
+      sessionId: '8a4cb66f-6ff6-4cf0-9a16-a08697480a8f',
+      source: 'quad-box',
+      timestamp: 1_700_000_600_000,
+      start: 1_700_000_000_000,
+      status: 'completed',
+      title: 'tally dual',
+      mode: 'tally',
+      variant: 'tally dual',
+      nBack: 2,
+      tags: ['position0', 'position1'],
+      scores: { tally: { hits: 18, misses: 0, possible: 24 } },
+      completedTrials: 30,
+    }
+
+    const parsed = parseSessionBackup(serializeSessionBackup([
+      tally,
+    ], '2026-08-23T12:00:00.000Z'))
+    expect(parsed.games).toEqual([tally])
+  })
+
   it('rejects malformed JSON and unsupported backup versions', () => {
     expect(() => parseSessionBackup('{broken')).toThrow('not valid JSON')
     expect(() => parseSessionBackup(JSON.stringify({

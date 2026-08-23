@@ -1,3 +1,5 @@
+import { createSessionId } from '../sessionId.js';
+
 // DOCCT Game Engine — Pure logic with Web Audio API
 // Forensically matched to the original at docct.pages.dev
 
@@ -119,15 +121,6 @@ const DEFAULT_SETTINGS: GameSettings = {
 
 function generateDigit(): number {
   return Math.floor(Math.random() * 9) + 1;
-}
-
-function createSessionId(): string {
-  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
-    const random = Math.floor(Math.random() * 16);
-    const value = character === 'x' ? random : (random & 0x3) | 0x8;
-    return value.toString(16);
-  });
 }
 
 function loadSettingsFromStorage(): GameSettings {
