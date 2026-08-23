@@ -1,11 +1,16 @@
 <script>
   import { onMount } from 'svelte'
-  import { Download, FileJson, RefreshCw } from '@lucide/svelte'
+  import { Download, FileJson, RefreshCw, Upload } from '@lucide/svelte'
   import { getAllCompletedGames } from '../gamedb'
   import { formatSeconds } from '../utils'
   import { settings } from '../../stores/settingsStore'
   import ActivityHeatmap from './ActivityHeatmap.svelte'
   import StatisticsChart from './StatisticsChart.svelte'
+  import {
+    exportSessionHistoryBackup,
+    importSessionHistoryBackup,
+  } from '../sessionTransfer'
+  import { MAX_BACKUP_CHARACTERS } from '../sessionBackup'
   import {
     METRICS,
     filterSessions,
@@ -25,6 +30,10 @@
   let mode = 'all'
   let range = 'all'
   let metric = 'accuracy'
+  let importInput
+  let importing = false
+  let importMessage = ''
+  let importError = ''
 
   const brainWorkshopMetrics = ['adjusted', 'n', 'accuracy', 'nAccuracy', 'weightedAccuracy']
   const docctMetrics = [...brainWorkshopMetrics, 'fastestInterval', 'responseTime']
@@ -82,13 +91,43 @@
     download('cognitive-suite-sessions.csv', sessionsToCsv(filtered), 'text/csv;charset=utf-8')
   }
 
-  function exportJson() {
-    const payload = JSON.stringify({
-      schemaVersion: 1,
-      exportedAt: new Date().toISOString(),
-      games,
-    }, null, 2)
-    download('cognitive-suite-backup.json', payload, 'application/json')
+  async function exportJson() {
+    importError = ''
+    try {
+      const payload = await exportSessionHistoryBackup()
+      download('cognitive-suite-backup.json', payload, 'application/json')
+    } catch (reason) {
+      importError = reason?.message || 'The backup could not be exported.'
+    }
+  }
+
+  function chooseImportFile() {
+    importInput?.click()
+  }
+
+  async function importJson(event) {
+    const input = event.currentTarget
+    const file = input.files?.[0]
+    input.value = ''
+    if (!file) return
+
+    importing = true
+    importMessage = ''
+    importError = ''
+    try {
+      if (file.size > MAX_BACKUP_CHARACTERS) {
+        throw new Error('Backup files must be 25 MB or smaller.')
+      }
+      const report = await importSessionHistoryBackup(await file.text())
+      await load()
+      importMessage = report.added > 0
+        ? `Imported ${report.added} session${report.added === 1 ? '' : 's'}; skipped ${report.duplicates} duplicate${report.duplicates === 1 ? '' : 's'}. ${report.total} total sessions.`
+        : `No new sessions found; skipped ${report.duplicates} duplicate${report.duplicates === 1 ? '' : 's'}. ${report.total} total sessions.`
+    } catch (reason) {
+      importError = `${reason?.message || 'The backup could not be imported.'} No sessions were changed.`
+    } finally {
+      importing = false
+    }
   }
 
   const formatPercent = (value) => `${(value * 100).toFixed(0)}%`
@@ -265,15 +304,35 @@
             <h2 class="text-sm font-semibold">Recent sessions</h2>
             <p class="mt-1 text-xs opacity-55">Latest 20 selected sessions.</p>
           </div>
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2">
+            <input
+              bind:this={importInput}
+              type="file"
+              accept=".json,application/json"
+              class="hidden"
+              on:change={importJson}
+            />
+            <button class="btn btn-sm" on:click={chooseImportFile} disabled={importing}>
+              <Upload size={16} /> {importing ? 'Importing' : 'Import JSON'}
+            </button>
             <button class="btn btn-sm" on:click={exportCsv} disabled={!filtered.length}>
               <Download size={16} /> CSV
             </button>
             <button class="btn btn-sm" on:click={exportJson} disabled={!games.length}>
-              <FileJson size={16} /> JSON backup
+              <FileJson size={16} /> Export JSON
             </button>
           </div>
         </div>
+
+        {#if importMessage}
+          <div class="mb-4 border-l-4 border-success bg-success/10 px-4 py-3 text-sm" role="status" aria-live="polite">
+            {importMessage}
+          </div>
+        {:else if importError}
+          <div class="mb-4 border-l-4 border-error bg-error/10 px-4 py-3 text-sm" role="alert">
+            {importError}
+          </div>
+        {/if}
 
         <div class="overflow-x-auto border border-base-300">
           <table class="table table-sm min-w-[850px]">

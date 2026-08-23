@@ -44,6 +44,18 @@ Node.js and npm are not required to use these downloads.
 Windows and macOS builds are currently unsigned, so the operating system may
 show a security warning on first launch.
 
+## Move training history between devices
+
+1. On the source device, open **Statistics** and select **Export JSON**.
+2. Move `cognitive-suite-backup.json` to the destination device.
+3. On the destination device, open **Statistics**, select **Import JSON**, and
+   choose the backup file.
+
+Imports are additive: sessions from both devices are merged, duplicates are
+skipped, and malformed or conflicting backups make no changes. The JSON backup
+contains completed Quad Box and DocCT sessions, but not application settings.
+Treat backup files as private training data.
+
 ## Build from source
 
 Desktop packaging uses Electron and Electron Builder. Release builds require

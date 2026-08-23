@@ -975,9 +975,11 @@ describe('Score calculation', () => {
     expect(s.sessionResults).not.toBeNull();
     expect(s.sessionResults!.mode).toBe('1-back');
     expect(s.sessionResults!.completedAt).toBeTruthy();
+    expect(s.sessionResults!.sessionId).toMatch(/^[0-9a-f-]{36}$/i);
 
     const history = e.loadHistory();
     expect(history.length).toBeGreaterThanOrEqual(1);
+    expect(history.at(-1)!.sessionId).toBe(s.sessionResults!.sessionId);
     e.dispose();
   });
 });

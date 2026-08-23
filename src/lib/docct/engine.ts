@@ -21,6 +21,7 @@ export interface GameSettings {
 }
 
 export interface SessionResult {
+  sessionId: string;
   completedAt: string;
   mode: string;
   intervalMode: 'adaptive' | 'fixed';
@@ -120,6 +121,15 @@ function generateDigit(): number {
   return Math.floor(Math.random() * 9) + 1;
 }
 
+function createSessionId(): string {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = character === 'x' ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
 function loadSettingsFromStorage(): GameSettings {
   if (typeof localStorage === 'undefined') return { ...DEFAULT_SETTINGS };
   try {
@@ -167,6 +177,9 @@ function validateSessionResult(entry: any): SessionResult | null {
     return null;
   }
   return {
+    sessionId: typeof entry.sessionId === 'string' && entry.sessionId
+      ? entry.sessionId
+      : `docct:${completedAt}`,
     completedAt, mode,
     intervalMode: entry.intervalMode === 'fixed' ? 'fixed' : 'adaptive',
     adaptationMode: entry.adaptationMode === 'classic' ? 'classic' : 'responsive',
@@ -719,6 +732,7 @@ export function createEngine(
     const averageResponseMs = responseCount > 0 ? totalResponseMs / responseCount : 0;
 
     sessionResults = {
+      sessionId: createSessionId(),
       completedAt: new Date().toISOString(),
       mode: settings.taskMode,
       intervalMode: settings.intervalMode,

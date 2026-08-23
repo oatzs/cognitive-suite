@@ -1,7 +1,12 @@
 import { getGameDay, getTruncatedDate } from "./utils"
 const DB_NAME = "QuadBoxNBack"
-const DB_VERSION = 2
+const DB_VERSION = 3
 const STORE_NAME = "games"
+
+const createSessionId = () => {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
 
 const openDB = () => {
   return new Promise((resolve, reject) => {
@@ -31,6 +36,9 @@ const openDB = () => {
       if (!store.indexNames.contains("source_session")) {
         store.createIndex("source_session", ["source", "sourceSessionId"], { unique: true })
       }
+      if (!store.indexNames.contains("session_id")) {
+        store.createIndex("session_id", "sessionId", { unique: true })
+      }
     }
 
     request.onsuccess = () => resolve(request.result)
@@ -42,7 +50,10 @@ export async function addGame(gameInfo) {
   const db = await openDB()
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite")
-    tx.objectStore(STORE_NAME).add(gameInfo)
+    tx.objectStore(STORE_NAME).add({
+      ...gameInfo,
+      sessionId: gameInfo.sessionId || createSessionId(),
+    })
     tx.oncomplete = () => {
       db.close()
       resolve()
@@ -58,6 +69,40 @@ export async function addGame(gameInfo) {
   })
 }
 
+export async function addImportedGames(games) {
+  if (!Array.isArray(games)) throw new TypeError('Imported games must be an array')
+  if (games.length === 0) return 0
+
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite")
+    const store = tx.objectStore(STORE_NAME)
+    let failure
+
+    for (const game of games) {
+      const record = { ...game }
+      delete record.id
+      const request = store.add(record)
+      request.onerror = () => {
+        failure = request.error
+      }
+    }
+
+    tx.oncomplete = () => {
+      db.close()
+      resolve(games.length)
+    }
+    tx.onerror = () => {
+      db.close()
+      reject(failure || tx.error || new Error('Could not import sessions'))
+    }
+    tx.onabort = () => {
+      db.close()
+      reject(failure || tx.error || new Error('Could not import sessions'))
+    }
+  })
+}
+
 export async function addDocctSession(session) {
   const completedAt = new Date(session.completedAt)
   if (!Number.isFinite(completedAt.getTime())) return false
@@ -68,9 +113,11 @@ export async function addDocctSession(session) {
   const durationSec = Math.max(0, Number(session.durationSec) || 0)
   const nBack = session.mode === '2-back' ? 2 : session.mode === 'variable' ? 1.5 : 1
   const timestamp = completedAt.getTime()
+  const sourceSessionId = session.completedAt
   const record = {
+    ...(session.sessionId ? { sessionId: session.sessionId } : {}),
     source: 'docct',
-    sourceSessionId: session.completedAt,
+    sourceSessionId,
     timestamp,
     start: timestamp - durationSec * 1000,
     status: 'completed',
@@ -89,7 +136,7 @@ export async function addDocctSession(session) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite")
     const store = tx.objectStore(STORE_NAME)
-    const existing = store.index("source_session").getKey(['docct', session.completedAt])
+    const existing = store.index("source_session").getKey(['docct', sourceSessionId])
     let added = false
 
     existing.onsuccess = () => {
