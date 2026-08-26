@@ -20,7 +20,7 @@
     </div>
 
     <nav aria-label="Training views" class="flex h-full min-w-0 flex-1 items-center justify-center gap-1">
-      {#each views as view}
+      {#each views as view (view.id)}
         <button
           type="button"
           class="suite-nav-item flex h-9 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-xs font-medium sm:px-4 sm:text-sm"

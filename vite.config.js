@@ -9,4 +9,5 @@ export default defineConfig({
     svelte(),
   ],
   base: process.env.BASE_PATH || './',
+  resolve: process.env.VITEST ? { conditions: ['browser'] } : undefined,
 })

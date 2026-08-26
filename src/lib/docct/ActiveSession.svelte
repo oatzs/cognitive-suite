@@ -3,13 +3,13 @@
   import type { Engine, GameState } from './engine';
 
   let { engine }: { engine: Engine } = $props();
-  let state = $state<GameState>(untrack(() => engine.getState()));
+  let gameState = $state<GameState>(untrack(() => engine.getState()));
 
   $effect(() => {
-    return engine.subscribe((s) => { state = s; });
+    return engine.subscribe((s) => { gameState = s; });
   });
 
-  // ── UI state (local to this component, not part of engine) ─────────────
+  // ── UI gameState (local to this component, not part of engine) ─────────────
   let selectedButton = $state<number | null>(null); // which keypad button is visually highlighted
   let keyValue = $state('');       // current keyboard input value (text input mode)
   let swipeActive = $state(false); // true while finger is down on the keypad (touch mode)
@@ -19,14 +19,14 @@
   let ringProgress = $state(201);  // SVG circle stroke-dashoffset (201 = empty, 0 = full)
   const answerValues = Array.from({ length: 17 }, (_, index) => index + 2);
 
-  // Derived primitives: Svelte 5 $effect tracks the whole `state` proxy, so any
+  // Derived primitives: Svelte 5 $effect tracks the whole `gameState` proxy, so any
   // notify() (including submitAnswer) re-runs the effect and restarts the ring.
   // By extracting primitives into $derived, the effect only re-runs when the
-  // underlying value actually changes — not on every state object replacement.
-  const ringInterval = $derived(state.currentInterval);
-  const ringDigitGen = $derived(state.digitGeneration);
-  const ringDigit = $derived(state.currentDigit);
-  const ringVoice = $derived(state.settings.useVoice);
+  // underlying value actually changes — not on every gameState object replacement.
+  const ringInterval = $derived(gameState.currentInterval);
+  const ringDigitGen = $derived(gameState.digitGeneration);
+  const ringDigit = $derived(gameState.currentDigit);
+  const ringVoice = $derived(gameState.settings.useVoice);
 
   // JS-driven progress ring: runs on every new digit, animates via requestAnimationFrame.
   // Depends on derived primitives only — submitAnswer() → notify() does NOT change
@@ -109,7 +109,7 @@
     }
   }
 
-  function handleKeypadTouchEnd(e: TouchEvent) {
+  function handleKeypadTouchEnd() {
     if (!swipeActive) return;
     endSwipe();
     // Already submitted in touchstart/touchmove — nothing more to do.
@@ -177,12 +177,12 @@
   }
 
   function handleBeforeInput(e: InputEvent) {
-    if (isPaused || !state.canAnswer) e.preventDefault();
+    if (isPaused || !gameState.canAnswer) e.preventDefault();
   }
 
   function handleInput(e: Event) {
     const input = e.target as HTMLInputElement;
-    if (isPaused || !state.canAnswer) {
+    if (isPaused || !gameState.canAnswer) {
       input.value = '';
       keyValue = '';
       return;
@@ -196,7 +196,7 @@
     }
     keyValue = raw;
     // Auto-submit if valid 2-digit range
-    if (raw !== '' && state.canAnswer) {
+    if (raw !== '' && gameState.canAnswer) {
       const num = parseInt(raw);
       if (num >= 2 && num <= 18) {
         engine.submitAnswer(num);
@@ -213,19 +213,15 @@
       e.preventDefault();
       e.stopImmediatePropagation();
       keyValue = '';
-      if (state.phase === 'active') {
+      if (gameState.phase === 'active') {
         engine.pause();
       }
       return;
     }
   }
 
-  function resetInput() {
-    keyValue = '';
-  }
-
-  const isPaused = $derived(state.phase === 'paused');
-  const inputGeneration = $derived(state.digitGeneration);
+  const isPaused = $derived(gameState.phase === 'paused');
+  const inputGeneration = $derived(gameState.digitGeneration);
 
   // Clear selection and keyboard input on every new interval, even when two
   // consecutive intervals happen to generate the same digit.
@@ -234,10 +230,10 @@
   // and the turn is marked wrong. Guard with a short freshness window so a
   // missed touchend/touchcancel cannot keep submitting stale answers forever.
   // Uses untrack() for swipeActive/selectedButton so the effect ONLY re-runs
-  // when digitGeneration advances — not on every notify() → state replacement,
+  // when digitGeneration advances — not on every notify() → gameState replacement,
   // which would clear the input or highlight immediately after submission.
   $effect(() => {
-    inputGeneration; // only tracked dependency
+    void inputGeneration; // only tracked dependency
     const swiping = untrack(() => swipeActive);
     const selected = untrack(() => selectedButton);
     const touchAge = Date.now() - untrack(() => lastTouchStartTime);
@@ -254,7 +250,7 @@
   // Status text for keyboard mode
   const statusText = $derived(
     isPaused ? 'Paused' :
-    state.canAnswer ? 'Type a number' :
+    gameState.canAnswer ? 'Type a number' :
     'Wait for enough digits...'
   );
 </script>
@@ -264,15 +260,15 @@
     data-digit-display
     class="flex items-center justify-center {compact ? 'h-[72px] w-[72px] md:h-[88px] md:w-[88px]' : 'w-[88px] py-6'}"
   >
-    {#if state.settings.useVoice}
-      {#if state.isPlayingAudio}
+    {#if gameState.settings.useVoice}
+      {#if gameState.isPlayingAudio}
         <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" fill="#a9b4cc" viewBox="0 0 256 256" aria-label="Playing digit"><path d="M168,32V224a8,8,0,0,1-12.91,6.31L85.25,176H40a16,16,0,0,1-16-16V96A16,16,0,0,1,40,80H85.25l69.84-54.31A8,8,0,0,1,168,32Zm32,64a8,8,0,0,0-8,8v48a8,8,0,0,0,16,0V104A8,8,0,0,0,200,96Zm32-16a8,8,0,0,0-8,8v80a8,8,0,0,0,16,0V88A8,8,0,0,0,232,80Z"></path></svg>
       {:else}
         <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" fill="#a9b4cc" viewBox="0 0 256 256" aria-label="Voice digit"><path d="M168,32V224a8,8,0,0,1-12.91,6.31L85.25,176H40a16,16,0,0,1-16-16V96A16,16,0,0,1,40,80H85.25l69.84-54.31A8,8,0,0,1,168,32Zm32,64a8,8,0,0,0-8,8v48a8,8,0,0,0,16,0V104A8,8,0,0,0,200,96Z"></path></svg>
       {/if}
-    {:else if state.currentDigit !== null}
+    {:else if gameState.currentDigit !== null}
       <div class="relative">
-        <span role="status" aria-live="assertive" aria-atomic="true" aria-label={`Current digit ${state.currentDigit}`} class="text-4xl font-medium text-[#ffffff]">{state.currentDigit}</span>
+        <span role="status" aria-live="assertive" aria-atomic="true" aria-label={`Current digit ${gameState.currentDigit}`} class="text-4xl font-medium text-[#ffffff]">{gameState.currentDigit}</span>
         <svg class="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" width="72" height="72" viewBox="0 0 72 72" aria-hidden="true">
           <circle cx="36" cy="36" r="32" fill="none" stroke="#1a1f2e" stroke-width="4" />
           <circle
@@ -295,13 +291,13 @@
   <!-- Streak bar + label -->
   <div class="relative flex flex-col items-center">
     <div class="flex md:flex-col w-[200px] md:w-auto md:h-[200px] overflow-hidden rounded-full gap-3">
-      <div class="grow w-[10px] h-[10px] {state.correctStreak >= 1 ? 'streak-bar bg-[#4fe84f]' : state.wrongStreak >= 1 ? 'streak-bar bg-[#e85c4f]' : 'bg-[#10b981]'}"></div>
-      <div class="w-[10px] h-[10px] {state.correctStreak >= 2 ? 'streak-bar bg-[#4fe84f]' : state.wrongStreak >= 2 ? 'streak-bar bg-[#e85c4f]' : 'bg-[#0f121a]'}"></div>
-      <div class="w-[10px] h-[10px] {state.correctStreak >= 3 ? 'streak-bar bg-[#4fe84f]' : state.wrongStreak >= 3 ? 'streak-bar bg-[#e85c4f]' : 'bg-[#0f121a]'}"></div>
-      <div class="w-[10px] h-[10px] rounded-r-full md:rounded-r-none md:rounded-b-full {state.correctStreak === 4 ? 'streak-bar bg-[#4fe84f]' : state.wrongStreak >= 4 ? 'streak-bar bg-[#e85c4f]' : 'bg-[#0f121a]'}"></div>
+      <div class="grow w-[10px] h-[10px] {gameState.correctStreak >= 1 ? 'streak-bar bg-[#4fe84f]' : gameState.wrongStreak >= 1 ? 'streak-bar bg-[#e85c4f]' : 'bg-[#10b981]'}"></div>
+      <div class="w-[10px] h-[10px] {gameState.correctStreak >= 2 ? 'streak-bar bg-[#4fe84f]' : gameState.wrongStreak >= 2 ? 'streak-bar bg-[#e85c4f]' : 'bg-[#0f121a]'}"></div>
+      <div class="w-[10px] h-[10px] {gameState.correctStreak >= 3 ? 'streak-bar bg-[#4fe84f]' : gameState.wrongStreak >= 3 ? 'streak-bar bg-[#e85c4f]' : 'bg-[#0f121a]'}"></div>
+      <div class="w-[10px] h-[10px] rounded-r-full md:rounded-r-none md:rounded-b-full {gameState.correctStreak === 4 ? 'streak-bar bg-[#4fe84f]' : gameState.wrongStreak >= 4 ? 'streak-bar bg-[#e85c4f]' : 'bg-[#0f121a]'}"></div>
     </div>
     <span class="absolute top-full mt-12 hidden whitespace-nowrap text-xs font-medium text-[#a9b4cc] md:inline">
-      <span class="font-extrabold">{state.correctStreak}</span> STREAKS
+      <span class="font-extrabold">{gameState.correctStreak}</span> STREAKS
     </span>
   </div>
 
@@ -310,14 +306,14 @@
     <!-- Controls row: interval + mode status + pause/resume -->
     <div class="flex flex-col items-center justify-center gap-6 md:flex-row md:gap-0">
       <div class="flex grow items-center justify-center gap-3 md:justify-end">
-        {#if state.settings.displayMode === 'standard'}
-          <span data-interval-readout class="text-sm text-[#a9b4cc]"><span class="font-extrabold">{(state.currentInterval / 1000).toFixed(2)}</span> SECONDS</span>
-          {#if state.settings.intervalMode === 'fixed'}
+        {#if gameState.settings.displayMode === 'standard'}
+          <span data-interval-readout class="text-sm text-[#a9b4cc]"><span class="font-extrabold">{(gameState.currentInterval / 1000).toFixed(2)}</span> SECONDS</span>
+          {#if gameState.settings.intervalMode === 'fixed'}
             <span class="rounded-full bg-[#121621] px-2 py-1 text-xs font-semibold uppercase tracking-wide text-[#10b981]">Fixed</span>
           {/if}
         {/if}
-        {#if state.settings.taskMode === 'variable'}
-          <span class="rounded-full border border-[#10b981] px-3 py-1 text-xs font-semibold text-[#10b981]">{state.nBack}-BACK</span>
+        {#if gameState.settings.taskMode === 'variable'}
+          <span class="rounded-full border border-[#10b981] px-3 py-1 text-xs font-semibold text-[#10b981]">{gameState.nBack}-BACK</span>
         {/if}
 
         {#if isPaused}
@@ -334,21 +330,22 @@
     </div>
 
     <!-- Keypad area -->
-    {#if state.settings.useKeypad}
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
+    {#if gameState.settings.useKeypad}
       <div
-        data-keypad-layout={state.settings.keypadLayout}
+        data-keypad-layout={gameState.settings.keypadLayout}
+        role="group"
+        aria-label="Answer keypad"
         class="flex justify-center"
         style="touch-action: none;"
         ontouchmove={handleKeypadTouchMove}
         ontouchend={handleKeypadTouchEnd}
         ontouchcancel={handleKeypadTouchEnd}
       >
-        {#if state.settings.keypadLayout === 'sequential'}
+        {#if gameState.settings.keypadLayout === 'sequential'}
           <div class="sequential-keypad flex flex-col items-center gap-3">
             {@render digitDisplay(true)}
             <div class="grid grid-cols-6 gap-2 md:gap-3">
-              {#each answerValues as answer}
+              {#each answerValues as answer (answer)}
                 <button
                   data-answer={answer}
                   aria-label={`Answer ${answer}`}
@@ -420,7 +417,7 @@
           autocorrect="off"
           style="-webkit-user-select:text; user-select:text;"
           class="pointer-events-auto select-text caret-[#10b981] md:h-[288px] md:w-[588px] rounded-4xl bg-[#000000] py-6 text-center text-4xl font-extrabold text-[#10b981] placeholder:text-base sm:placeholder:text-xl [appearance:textfield] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#10b981] focus-visible:ring-offset-2 focus-visible:ring-offset-[#090a0d] md:py-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-          aria-disabled={isPaused || !state.canAnswer}
+          aria-disabled={isPaused || !gameState.canAnswer}
           placeholder={statusText}
           value={keyValue}
           onbeforeinput={handleBeforeInput}

@@ -1,10 +1,10 @@
 <script>
   export let trial = {}
   export let nextTrial = {}
-  export let presentation = {}
   export let trialIndex = 0
   import Cell from "./Cell.svelte"
   import { settings } from "../stores/settingsStore"
+  import { gameDisplayInfo } from "../stores/gameRunningStore"
   import { cacheNextTrial, createSvgId, findBoxColor, findShapeOuterColor } from "./trialUtils"
 
   const createCells = (trial) => {
@@ -26,11 +26,12 @@
   }
 
   const calculateRotationStyle = () => {
-    if ($settings.rotationSpeed === 0) {
+    const rotationSpeed = $gameDisplayInfo.rotationSpeed ?? $settings.rotationSpeed
+    if (rotationSpeed === 0) {
       return ''
     }
 
-    const ticks = Math.floor(2000 / $settings.rotationSpeed)
+    const ticks = Math.floor(2000 / rotationSpeed)
     const angle = (trialIndex % ticks) * 2 * Math.PI / ticks
 
     const radius = 7

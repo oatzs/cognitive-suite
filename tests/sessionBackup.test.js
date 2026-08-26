@@ -98,6 +98,87 @@ describe('session backup codec', () => {
     expect(() => parseSessionBackup(JSON.stringify(backup)))
       .toThrow('Invalid score key')
   })
+
+  it('rejects timestamps that cannot be displayed or exported', () => {
+    const game = fc.sample(sessionArbitrary, 1)[0]
+    game.timestamp = 1e300
+
+    expect(() => createSessionBackup([game])).toThrow('Invalid session timestamp')
+  })
+
+  it('accepts app-generated responsive intervals above the setup maximum', () => {
+    const timestamp = 1_700_000_600_000
+    const completedAt = new Date(timestamp).toISOString()
+    const game = {
+      sessionId: 'd602507b-a112-4a2a-9249-df90a36d5fe2',
+      source: 'docct',
+      timestamp,
+      start: timestamp - 600_000,
+      status: 'completed',
+      title: 'docct 1-back',
+      mode: 'docct',
+      variant: '1-back',
+      nBack: 1,
+      tags: ['answer'],
+      scores: { answer: { hits: 1, misses: 3, possible: 4 } },
+      completedTrials: 4,
+      trialTime: 65_000,
+      docct: {
+        sessionId: 'd602507b-a112-4a2a-9249-df90a36d5fe2',
+        completedAt,
+        mode: '1-back',
+        intervalMode: 'adaptive',
+        adaptationMode: 'responsive',
+        adaptationStepMs: 100,
+        durationSec: 600,
+        accuracy: 0.25,
+        fastestIntervalMs: 60_000,
+        endingIntervalMs: 65_000,
+        averageResponseTimeMs: 61_000,
+        correctCount: 1,
+        totalAnswers: 4,
+        streaks: 0,
+        useVoice: false,
+        useKeypad: true,
+      },
+    }
+
+    expect(() => createSessionBackup([game])).not.toThrow()
+  })
+
+  it('rejects inconsistent tally score shapes before persistence', () => {
+    const tally = {
+      sessionId: 'a5c5a0bb-a053-4956-a8c1-3f9933af15b7',
+      source: 'quad-box',
+      timestamp: 1_700_000_600_000,
+      start: 1_700_000_000_000,
+      status: 'completed',
+      title: 'tally dual',
+      mode: 'tally',
+      variant: 'tally dual',
+      nBack: 2,
+      tags: ['position0'],
+      scores: { tally: { hits: 5, misses: 0, possible: 4 } },
+      completedTrials: 10,
+    }
+
+    expect(() => createSessionBackup([tally])).toThrow('Invalid tally scores')
+    tally.scores.tally = { hits: 1, misses: 1, possible: 1 }
+    expect(() => createSessionBackup([tally])).toThrow('Invalid tally scores')
+    tally.scores.tally = { hits: 1, misses: 0, possible: 1 }
+    delete tally.scores.tally.possible
+    expect(() => createSessionBackup([tally])).toThrow('Invalid tally scores')
+    delete tally.scores.tally
+    expect(() => createSessionBackup([tally])).toThrow('Tally session requires tally scores')
+  })
+
+  it('rejects sessions whose start time is after completion', () => {
+    const game = fc.sample(sessionArbitrary, 1)[0]
+    game.start = game.timestamp + 1
+    delete game.trialTime
+
+    expect(() => createSessionBackup([game])).toThrow('Invalid session start')
+  })
 })
 
 describe('session backup merge planning', () => {
@@ -163,9 +244,29 @@ describe('session backup merge planning', () => {
     const existing = fc.sample(sessionArbitrary, 1)[0]
     const conflicting = structuredClone(existing)
     conflicting.scores.position.hits++
+    conflicting.scores.position.possible++
 
     expect(() => planSessionMerge([existing], [conflicting]))
       .toThrow('Conflicting imported session')
+  })
+
+  it('rejects different source sessions that reuse one session ID', () => {
+    const existing = fc.sample(sessionArbitrary, 1)[0]
+    existing.sourceSessionId = 'source-a'
+    const conflicting = structuredClone(existing)
+    conflicting.sourceSessionId = 'source-b'
+
+    expect(() => planSessionMerge([existing], [conflicting]))
+      .toThrow('Conflicting imported session: session:')
+  })
+
+  it('rejects duplicate identities inside an otherwise valid backup', () => {
+    const first = fc.sample(sessionArbitrary, 1)[0]
+    const duplicate = structuredClone(first)
+    duplicate.timestamp++
+
+    expect(() => createSessionBackup([first, duplicate]))
+      .toThrow('Duplicate session identity')
   })
 
   it('produces the same union regardless of import order', () => {

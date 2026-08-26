@@ -11,6 +11,7 @@ import { tallyFeedback } from "../stores/tallyFeedbackStore"
 import { analytics } from "../stores/analyticsStore"
 import { mobile } from "../stores/mobileStore"
 import { isPlaying, gameDisplayInfo } from "../stores/gameRunningStore"
+import { applyTallyCount, createSessionController } from "./sessionController"
 
 let trials
 let currentTrial
@@ -18,12 +19,12 @@ let nextTrial
 let trialsIndex
 let scoresheet = []
 let presentation
-let timeoutCancelFns
 let gameMeta = {}
+let sessionSettings = {}
 let gameId = 0
+let controller
 
 const resetRuntimeData = () => {
-  isPlaying.set(false)
   gameDisplayInfo.set({})
   trials = []
   currentTrial = {}
@@ -31,8 +32,8 @@ const resetRuntimeData = () => {
   trialsIndex = 0
   scoresheet = []
   presentation = { highlight: false, flash: false }
-  timeoutCancelFns = []
   gameMeta = {}
+  sessionSettings = {}
   gameId++
 }
 
@@ -49,7 +50,7 @@ $: isMobile = $mobile
 $: gameSettings = $settings.gameSettings[$settings.mode]
 $: game = generateTallyGame(gameSettings, $settings, gameId)
 $: applyNewGame(game, $isPlaying)
-$: trialDisplay = $settings.feedback === 'show' ? game.trials.length - trialsIndex : ''
+$: trialDisplay = $settings.feedback === 'show' ? ($isPlaying ? trials.length : game.trials.length) - trialsIndex : ''
 $: keys = gameDisplayInfo.getNumberKeys($gameDisplayInfo)
 
 const flashCube = async () => {
@@ -62,31 +63,10 @@ const flashCube = async () => {
   presentation.flash = false
 }
 
-const delay = async (ms) => {
-  let timeoutId
-  let rejectFn
-
-  const promise = new Promise((resolve, reject) => {
-    rejectFn = reject
-    timeoutId = setTimeout(resolve, ms)
-  })
-
-  const cancel = () => {
-    if (timeoutId !== undefined) {
-      clearTimeout(timeoutId)
-      rejectFn(new Error('Timeout cancelled'))
-      timeoutId = undefined
-    }
-  }
-
-  timeoutCancelFns.push(cancel)
-
-  return promise
-}
+const delay = (ms) => controller.delay(ms)
 
 const selectTrial = (i) => {
-  timeoutCancelFns.forEach(fn => fn())
-  timeoutCancelFns = []
+  controller.cancelPending()
   if (i >= trials.length) {
     endGame('completed')
     return
@@ -103,30 +83,20 @@ const selectTrial = (i) => {
 }
 
 const startGame = async () => {
-  if ($isPlaying) {
-    return
-  }
-  isPlaying.set(true)
-  gameMeta = { ...game.meta, start: Date.now() }
+  if (!controller.begin()) return
+  sessionSettings = structuredClone($settings)
+  gameMeta = { ...structuredClone(game.meta), start: Date.now(), rotationSpeed: sessionSettings.rotationSpeed }
   gameDisplayInfo.set(gameMeta)
-  audioPlayer.cacheAudioSource(gameSettings.audioSource)
+  audioPlayer.cacheAudioSource(sessionSettings.gameSettings[sessionSettings.mode].audioSource)
   trials = structuredClone(game.trials)
   scoresheet = new Array(trials.length).fill().map(() => ({}))
   presentation.highlight = true
   selectTrial(0)
 }
 
-const endGame = async (status) => {
-  if (!$isPlaying) {
-    return
-  }
-
+const finalizeGame = async (status) => {
   if (status === 'completed') {
-    try {
-      await delay(100)
-    } catch {
-      // ignore
-    }
+    await new Promise((resolve) => setTimeout(resolve, 100))
   }
 
   const gameInfoRecord = { ...gameMeta, timestamp: Date.now() }
@@ -135,10 +105,20 @@ const endGame = async (status) => {
   } else {
     console.debug('Game not recorded', trialsIndex, gameInfoRecord, scoresheet, trials)
   }
-  timeoutCancelFns.forEach(fn => fn())
+}
+
+const cleanupGame = () => {
   resetRuntimeData()
   tallyFeedback.reset()
 }
+
+controller = createSessionController({
+  setRunning: (running) => isPlaying.set(running),
+  finalize: finalizeGame,
+  cleanup: cleanupGame,
+})
+
+const endGame = (status) => controller.finish(status)
 
 const toggleGame = () => {
   if ($isPlaying) {
@@ -149,24 +129,27 @@ const toggleGame = () => {
 }
 
 const handleCount = (count) => {
-  if (!isPlaying || scoresheet.length <= trialsIndex || scoresheet[trialsIndex].success !== undefined) {
-    return
-  }
-
-  if (trialsIndex < gameDisplayInfo.nBack) {
-    selectTrial(trialsIndex + 1)
+  if (controller.phase() !== 'active') return
+  const result = applyTallyCount({
+    scoresheet,
+    trialIndex: trialsIndex,
+    nBack: gameMeta.nBack,
+    count,
+    matchCount: currentTrial.matches.length,
+  })
+  if (result.nextTrialIndex === trialsIndex) return
+  if (result.warmup) {
+    selectTrial(result.nextTrialIndex)
     return
   }
 
   tallyFeedback.reset()
-  scoresheet[trialsIndex].success = count === currentTrial.matches.length
-  scoresheet[trialsIndex].count = currentTrial.matches.length
   if (scoresheet[trialsIndex].success) {
     tallyFeedback.apply({ [count]: 'success' })
   } else {
     tallyFeedback.apply({ [count]: 'failure', [currentTrial.matches.length]: 'success' })
   }
-  selectTrial(trialsIndex + 1)
+  selectTrial(result.nextTrialIndex)
 }
 
 const handleKey = (event) => {
@@ -192,19 +175,19 @@ const suppressKey = (event) => {
 
 document.addEventListener('keydown', handleKey)
 
-onDestroy(async () => {
-  await endGame('cancelled')
+onDestroy(() => {
   document.removeEventListener('keydown', handleKey)
+  void endGame('cancelled')
 })
 
 </script>
 
-{#if $settings.mode === 'vtally'}
-<VisualCrank trial={currentTrial} {nextTrial} {presentation} trialIndex={trialsIndex} />
-{:else if $settings.mode === 'atally'}
+{#if $gameDisplayInfo.rules === 'vtally'}
+<VisualCrank trial={currentTrial} {nextTrial} trialIndex={trialsIndex} />
+{:else if $gameDisplayInfo.rules === 'atally'}
 <AudioIndicator {presentation} />
 {:else}
-<Grid trial={currentTrial} {nextTrial} {presentation} {gameId} />
+<Grid trial={currentTrial} {nextTrial} {presentation} />
 {/if}
 <div class="stretch grid grid-cols-[1fr_3fr_3fr_1fr] "
   class:grid-rows-[10fr_70fr_8fr]={!isMobile}

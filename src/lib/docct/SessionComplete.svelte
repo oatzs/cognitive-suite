@@ -1,5 +1,10 @@
 <script lang="ts">
   import type { Engine, GameState } from './engine';
+  import {
+    DOCCT_HIGH_SCORES_KEY,
+    LEGACY_DOCCT_HIGH_SCORES_KEY,
+    readDocctValue,
+  } from './persistence.js';
   import { onMount, untrack } from 'svelte';
 
   let { engine, onHistory }: { engine: Engine; onHistory?: () => void } = $props();
@@ -19,12 +24,14 @@
   // All-time best for this mode (from high scores)
   function getBestScores(mode: string) {
     try {
-      const raw = localStorage.getItem('docct:high-scores:v1') ?? localStorage.getItem('highScores');
+      const raw = readDocctValue(DOCCT_HIGH_SCORES_KEY, LEGACY_DOCCT_HIGH_SCORES_KEY);
       if (raw) {
         const all = JSON.parse(raw);
         return all[mode] || { fastest: 0, mostStreaks: 0, mostCorrect: 0 };
       }
-    } catch {}
+    } catch {
+      // Ignore corrupt legacy high-score data.
+    }
     return { fastest: 0, mostStreaks: 0, mostCorrect: 0 };
   }
 
@@ -77,14 +84,14 @@
       const chartModule = await import('chart.js/auto');
       const Chart = chartModule.default;
       const fontFamily = "'DM Sans', sans-serif";
-      const fontConfig = { family: fontFamily, size: 12, weight: '500' };
+      const fontConfig = { family: fontFamily, size: 12, weight: 500 };
 
       // Accuracy chart
       const accuracyData = state.history.slice().reverse().map((s, i) => ({ x: i, y: Math.round(s.accuracy * 100) }));
       new Chart(accuracyCanvas, {
         type: 'line',
         data: {
-          labels: accuracyData.map(d => ''),
+          labels: accuracyData.map(() => ''),
           datasets: [{
             data: accuracyData.map(d => d.y),
             borderColor: '#10b981',
@@ -97,9 +104,7 @@
             pointHoverBorderColor: '#10b981',
             fill: true,
             backgroundColor: 'rgba(79,121,232,0.18)',
-            tension: 0.28,
-            categoryPercentage: 1,
-            barPercentage: 1
+            tension: 0.28
           }]
         },
         options: {
@@ -115,8 +120,8 @@
           scales: {
             x: { display: false },
             y: {
-              min: 0, max: 100, stepSize: 25,
-              ticks: { color: '#7e8baa', font: fontConfig, callback: (v: any) => `${v}%` },
+              min: 0, max: 100,
+              ticks: { color: '#7e8baa', font: fontConfig, stepSize: 25, callback: (v: any) => `${v}%` },
               grid: { color: '#121621' },
               border: { display: false }
             }
@@ -134,7 +139,7 @@
       new Chart(intervalCanvas, {
         type: 'line',
         data: {
-          labels: intervalData.map(d => ''),
+          labels: intervalData.map(() => ''),
           datasets: [{
             data: intervalData.map(d => d.y),
             borderColor: '#d5b15e',
@@ -147,9 +152,7 @@
             pointHoverBorderColor: '#d5b15e',
             fill: true,
             backgroundColor: 'rgba(213,177,94,0.14)',
-            tension: 0.28,
-            categoryPercentage: 1,
-            barPercentage: 1
+            tension: 0.28
           }]
         },
         options: {
@@ -175,7 +178,9 @@
           spanGaps: true
         }
       });
-    } catch {}
+    } catch {
+      // Charts are optional; the session summary remains usable without them.
+    }
   });
 </script>
 

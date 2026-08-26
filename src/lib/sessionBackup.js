@@ -1,6 +1,12 @@
 export const SESSION_BACKUP_SCHEMA_VERSION = 1
 export const MAX_BACKUP_SESSIONS = 100_000
 export const MAX_BACKUP_CHARACTERS = 25 * 1024 * 1024
+export const MIN_SESSION_TIMESTAMP = 0
+export const MAX_SESSION_TIMESTAMP = Date.UTC(2100, 0, 1)
+
+const MAX_COUNT = 1_000_000
+const MAX_DURATION_SECONDS = 86_400
+const MAX_INTERVAL_MS = MAX_DURATION_SECONDS * 1000
 
 export class SessionBackupError extends Error {
   constructor(message) {
@@ -13,10 +19,15 @@ const isPlainObject = (value) => Object.prototype.toString.call(value) === '[obj
 const unsafeObjectKeys = new Set(['__proto__', 'constructor', 'prototype'])
 
 const finiteNumber = (value, field, { min = -Infinity, max = Infinity } = {}) => {
-  const number = Number(value)
-  if (!Number.isFinite(number) || number < min || number > max) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
     throw new SessionBackupError(`Invalid ${field}`)
   }
+  return value
+}
+
+const integerNumber = (value, field, bounds) => {
+  const number = finiteNumber(value, field, bounds)
+  if (!Number.isInteger(number)) throw new SessionBackupError(`Invalid ${field}`)
   return number
 }
 
@@ -34,7 +45,7 @@ const requiredString = (value, field, maxLength = 256) => {
   return result
 }
 
-const sanitizeScores = (scores) => {
+const sanitizeScores = (scores, tallyMode) => {
   if (!isPlainObject(scores)) throw new SessionBackupError('Invalid scores')
   const sanitized = {}
 
@@ -45,13 +56,26 @@ const sanitizeScores = (scores) => {
     if (!isPlainObject(score)) {
       throw new SessionBackupError('Invalid score entry')
     }
-    sanitized[key] = {
-      hits: finiteNumber(score.hits, `${key} hits`, { min: 0 }),
-      misses: finiteNumber(score.misses ?? 0, `${key} misses`, { min: 0 }),
+    const hits = integerNumber(score.hits, `${key} hits`, { min: 0, max: MAX_COUNT })
+    const misses = integerNumber(score.misses ?? 0, `${key} misses`, { min: 0, max: MAX_COUNT })
+    sanitized[key] = { hits, misses }
+
+    if (key === 'tally') {
+      if (!tallyMode || score.possible === undefined) {
+        throw new SessionBackupError('Invalid tally scores')
+      }
+      const possible = integerNumber(score.possible, `${key} possible`, { min: 0, max: MAX_COUNT })
+      if (hits > possible || misses !== 0) throw new SessionBackupError('Invalid tally scores')
+      sanitized[key].possible = possible
+    } else if (score.possible !== undefined) {
+      const possible = integerNumber(score.possible, `${key} possible`, { min: 0, max: MAX_COUNT })
+      if (possible !== hits + misses) throw new SessionBackupError(`Invalid ${key} possible`)
+      sanitized[key].possible = possible
     }
-    if (score.possible !== undefined) {
-      sanitized[key].possible = finiteNumber(score.possible, `${key} possible`, { min: 0 })
-    }
+  }
+
+  if (tallyMode && !Object.hasOwn(sanitized, 'tally')) {
+    throw new SessionBackupError('Tally session requires tally scores')
   }
 
   return sanitized
@@ -61,20 +85,29 @@ const sanitizeDocct = (docct) => {
   if (docct === undefined || docct === null) return undefined
   if (!isPlainObject(docct)) throw new SessionBackupError('Invalid DocCT session data')
 
+  const completedAt = requiredString(docct.completedAt, 'DocCT completion time')
+  const completedTimestamp = new Date(completedAt).getTime()
+  if (!Number.isFinite(completedTimestamp) || completedTimestamp < MIN_SESSION_TIMESTAMP || completedTimestamp > MAX_SESSION_TIMESTAMP) {
+    throw new SessionBackupError('Invalid DocCT completion time')
+  }
+  const correctCount = integerNumber(docct.correctCount, 'DocCT correct count', { min: 0, max: MAX_COUNT })
+  const totalAnswers = integerNumber(docct.totalAnswers, 'DocCT answer count', { min: 0, max: MAX_COUNT })
+  if (correctCount > totalAnswers) throw new SessionBackupError('Invalid DocCT answer counts')
+
   const sanitized = {
-    completedAt: requiredString(docct.completedAt, 'DocCT completion time'),
+    completedAt,
     mode: requiredString(docct.mode, 'DocCT mode', 50),
     intervalMode: requiredString(docct.intervalMode, 'DocCT interval mode', 50),
     adaptationMode: requiredString(docct.adaptationMode, 'DocCT adaptation mode', 50),
-    adaptationStepMs: finiteNumber(docct.adaptationStepMs, 'DocCT adaptation step', { min: 0 }),
-    durationSec: finiteNumber(docct.durationSec, 'DocCT duration', { min: 0 }),
+    adaptationStepMs: finiteNumber(docct.adaptationStepMs, 'DocCT adaptation step', { min: 50, max: 500 }),
+    durationSec: finiteNumber(docct.durationSec, 'DocCT duration', { min: 0, max: MAX_DURATION_SECONDS }),
     accuracy: finiteNumber(docct.accuracy, 'DocCT accuracy', { min: 0, max: 1 }),
-    fastestIntervalMs: finiteNumber(docct.fastestIntervalMs, 'DocCT fastest interval', { min: 0 }),
-    endingIntervalMs: finiteNumber(docct.endingIntervalMs, 'DocCT ending interval', { min: 0 }),
-    averageResponseTimeMs: finiteNumber(docct.averageResponseTimeMs, 'DocCT response time', { min: 0 }),
-    correctCount: finiteNumber(docct.correctCount, 'DocCT correct count', { min: 0 }),
-    totalAnswers: finiteNumber(docct.totalAnswers, 'DocCT answer count', { min: 0 }),
-    streaks: finiteNumber(docct.streaks, 'DocCT streak count', { min: 0 }),
+    fastestIntervalMs: finiteNumber(docct.fastestIntervalMs, 'DocCT fastest interval', { min: 1, max: MAX_INTERVAL_MS }),
+    endingIntervalMs: finiteNumber(docct.endingIntervalMs, 'DocCT ending interval', { min: 1, max: MAX_INTERVAL_MS }),
+    averageResponseTimeMs: finiteNumber(docct.averageResponseTimeMs, 'DocCT response time', { min: 0, max: MAX_INTERVAL_MS }),
+    correctCount,
+    totalAnswers,
+    streaks: integerNumber(docct.streaks, 'DocCT streak count', { min: 0, max: MAX_COUNT }),
     useVoice: Boolean(docct.useVoice),
     useKeypad: Boolean(docct.useKeypad),
   }
@@ -96,17 +129,22 @@ export function toPortableSession(game) {
     ? [...new Set(game.tags.map((tag) => requiredString(tag, 'session tag', 100)))]
     : []
 
+  const tallyMode = mode === 'tally'
+  const timestamp = integerNumber(game.timestamp, 'session timestamp', {
+    min: MIN_SESSION_TIMESTAMP,
+    max: MAX_SESSION_TIMESTAMP,
+  })
   const sanitized = {
     source,
-    timestamp: finiteNumber(game.timestamp, 'session timestamp', { min: 1 }),
+    timestamp,
     status: 'completed',
     title,
     mode,
     variant,
     nBack: finiteNumber(game.nBack, 'n-back level', { min: 0, max: 100 }),
     tags,
-    scores: sanitizeScores(game.scores),
-    completedTrials: finiteNumber(game.completedTrials, 'completed trials', { min: 0 }),
+    scores: sanitizeScores(game.scores, tallyMode),
+    completedTrials: integerNumber(game.completedTrials, 'completed trials', { min: 0, max: MAX_COUNT }),
   }
 
   const sessionId = optionalString(game.sessionId, 'session ID')
@@ -114,17 +152,35 @@ export function toPortableSession(game) {
   if (sessionId) sanitized.sessionId = sessionId
   if (sourceSessionId) sanitized.sourceSessionId = sourceSessionId
   if (game.trialTime !== undefined) {
-    sanitized.trialTime = finiteNumber(game.trialTime, 'trial time', { min: 0 })
+    sanitized.trialTime = finiteNumber(game.trialTime, 'trial time', { min: 1, max: MAX_INTERVAL_MS })
   }
   if (game.start !== undefined) {
-    sanitized.start = finiteNumber(game.start, 'session start', { min: 1 })
+    sanitized.start = integerNumber(game.start, 'session start', {
+      min: MIN_SESSION_TIMESTAMP,
+      max: timestamp,
+    })
   }
   if (sanitized.trialTime === undefined && sanitized.start === undefined) {
     throw new SessionBackupError('Session requires trial time or start time')
   }
+  if (tallyMode) {
+    if (sanitized.start === undefined || sanitized.completedTrials <= 0) {
+      throw new SessionBackupError('Tally session requires start time and completed trials')
+    }
+    if (sanitized.scores.tally.possible > sanitized.completedTrials) {
+      throw new SessionBackupError('Invalid tally scores')
+    }
+  } else if (Object.hasOwn(sanitized.scores, 'tally')) {
+    throw new SessionBackupError('Invalid tally scores')
+  }
 
   const docct = sanitizeDocct(game.docct)
-  if (docct) sanitized.docct = docct
+  if (docct) {
+    if (new Date(docct.completedAt).getTime() !== timestamp) {
+      throw new SessionBackupError('DocCT completion time does not match session timestamp')
+    }
+    sanitized.docct = docct
+  }
   return sanitized
 }
 
@@ -139,10 +195,23 @@ export function createSessionBackup(games, exportedAt = new Date().toISOString()
   if (!Array.isArray(games)) throw new SessionBackupError('Backup sessions must be an array')
   if (games.length > MAX_BACKUP_SESSIONS) throw new SessionBackupError('Backup contains too many sessions')
 
+  const portableGames = games.map(toPortableSession)
+  const identities = new Set()
+  for (const game of portableGames) {
+    const keys = [
+      game.sessionId ? `session:${game.sessionId}` : null,
+      game.sourceSessionId ? `source:${game.source}:${game.sourceSessionId}` : null,
+    ].filter(Boolean)
+    for (const key of keys) {
+      if (identities.has(key)) throw new SessionBackupError(`Duplicate session identity: ${key}`)
+      identities.add(key)
+    }
+  }
+
   return {
     schemaVersion: SESSION_BACKUP_SCHEMA_VERSION,
     exportedAt: validateExportedAt(exportedAt),
-    games: games.map(toPortableSession),
+    games: portableGames,
   }
 }
 
@@ -182,10 +251,12 @@ const stableValue = (value) => {
 
 const canonicalSession = (game) => JSON.stringify(stableValue(game))
 
-const sessionIdentity = (game) => {
-  if (game.sourceSessionId) return `source:${game.source}:${game.sourceSessionId}`
-  if (game.sessionId) return `session:${game.sessionId}`
-  return `legacy:${canonicalSession(game)}`
+const sessionIdentities = (game) => {
+  const identities = []
+  if (game.sourceSessionId) identities.push(`source:${game.source}:${game.sourceSessionId}`)
+  if (game.sessionId) identities.push(`session:${game.sessionId}`)
+  if (identities.length === 0) identities.push(`legacy:${canonicalSession(game)}`)
+  return identities
 }
 
 const comparableSession = (game) => {
@@ -202,29 +273,33 @@ export function planSessionMerge(existingGames, importedGames) {
 
   const known = new Map()
   for (const game of existingGames.map(toPortableSession)) {
-    const identity = sessionIdentity(game)
     const canonical = canonicalSession(comparableSession(game))
-    const previous = known.get(identity)
-    if (previous && previous !== canonical) {
-      throw new SessionBackupError(`Conflicting existing session: ${identity}`)
+    for (const identity of sessionIdentities(game)) {
+      const previous = known.get(identity)
+      if (previous && previous !== canonical) {
+        throw new SessionBackupError(`Conflicting existing session: ${identity}`)
+      }
+      known.set(identity, canonical)
     }
-    known.set(identity, canonical)
   }
 
   const additions = []
   let duplicates = 0
   for (const game of importedGames.map(toPortableSession)) {
-    const identity = sessionIdentity(game)
+    const identities = sessionIdentities(game)
     const canonical = canonicalSession(comparableSession(game))
-    const previous = known.get(identity)
-    if (previous !== undefined) {
-      if (previous !== canonical) {
-        throw new SessionBackupError(`Conflicting imported session: ${identity}`)
+    const knownIdentities = identities.filter((identity) => known.has(identity))
+    if (knownIdentities.length > 0) {
+      for (const identity of knownIdentities) {
+        if (known.get(identity) !== canonical) {
+          throw new SessionBackupError(`Conflicting imported session: ${identity}`)
+        }
       }
       duplicates++
+      for (const identity of identities) known.set(identity, canonical)
       continue
     }
-    known.set(identity, canonical)
+    for (const identity of identities) known.set(identity, canonical)
     additions.push(game)
   }
 

@@ -2,7 +2,6 @@
   export let trial = {}
   export let nextTrial = {}
   export let presentation = {}
-  export let gameId = 0
   import Cell from "./Cell.svelte"
   import Frame from "./Frame.svelte"
   import { settings } from "../stores/settingsStore"
@@ -32,14 +31,14 @@
   }
   const rotationStart = determineRotationStart()
 
-  $: rotationTime = (3400 / $settings.rotationSpeed).toFixed(0)
+  $: rotationTime = (3400 / ($gameDisplayInfo.rotationSpeed ?? $settings.rotationSpeed)).toFixed(0)
   $: svgId = createSvgId(trial.shape, trial.color, trial.image, $settings)
   $: shapeOuterColor = findShapeOuterColor(trial.color, $settings)
   $: boxColor = findBoxColor(trial.shape, trial.color, trial.image, $settings)
   $: cacheNextTrial(nextTrial, $settings)
   $: highlight = presentation.highlight
   $: flash = presentation.flash
-  $: grid = gameDisplayInfo.grid ?? $gameSettings.grid ?? 'rotate3D'
+  $: grid = $gameDisplayInfo.grid ?? $gameSettings.grid ?? 'rotate3D'
 </script>
 
 {#if trial.variableNBack}

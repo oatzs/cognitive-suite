@@ -1,7 +1,11 @@
 // DOCCT Engine Tests — vitest
 // ---------------------------------------------------------------------------
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createEngine } from '../src/lib/docct/engine';
+import {
+  createEngine,
+  DOCCT_SETTING_LIMITS,
+  normalizeGameSettings,
+} from '../src/lib/docct/engine';
 import type { GameSettings } from '../src/lib/docct/engine';
 
 // ── Mock AudioContext (Node has no browser APIs) ────────────────────────────
@@ -789,6 +793,76 @@ describe('State machine transitions', () => {
     e.dispose();
   });
 
+  it('records a session only once when completion is requested repeatedly', async () => {
+    const onSessionComplete = vi.fn();
+    const e = createEngine(makeSettings({ onboardingCompleted: true }), onSessionComplete);
+    await startEngine(e);
+
+    e.stop();
+    const firstResult = e.getState().sessionResults;
+    e.stop();
+    e.stop();
+
+    expect(e.getState().phase).toBe('complete');
+    expect(e.getState().sessionResults).toEqual(firstResult);
+    expect(e.loadHistory()).toHaveLength(1);
+    expect(onSessionComplete).toHaveBeenCalledTimes(1);
+    e.dispose();
+  });
+
+  it('enters the complete phase even when the completion callback fails', async () => {
+    const failure = new Error('canonical persistence failed');
+    const onSessionComplete = vi.fn(() => { throw failure; });
+    const e = createEngine(makeSettings({ onboardingCompleted: true }), onSessionComplete);
+    await startEngine(e);
+
+    expect(() => e.stop()).toThrow(failure);
+    expect(e.getState()).toEqual(expect.objectContaining({
+      phase: 'complete',
+      currentDigit: null,
+      canAnswer: false,
+      isPlayingAudio: false,
+    }));
+    expect(() => e.stop()).not.toThrow();
+    expect(onSessionComplete).toHaveBeenCalledTimes(1);
+    e.dispose();
+  });
+
+  it('keeps active session settings immutable and blocks onboarding escape', async () => {
+    const e = createEngine(makeSettings({
+      onboardingCompleted: true,
+      taskMode: '1-back',
+      intervalMode: 'fixed',
+      startingInterval: 1000,
+      minimumInterval: 500,
+    }));
+    await startEngine(e);
+
+    e.updateSettings({
+      taskMode: '2-back',
+      intervalMode: 'adaptive',
+      startingInterval: 5000,
+      minimumInterval: 2000,
+    });
+    e.showOnboarding();
+
+    expect(e.getState().phase).toBe('active');
+    expect(e.getState().settings).toEqual(expect.objectContaining({
+      taskMode: '1-back',
+      intervalMode: 'fixed',
+      startingInterval: 1000,
+      minimumInterval: 500,
+    }));
+
+    e.stop();
+    expect(e.getState().sessionResults).toEqual(expect.objectContaining({
+      mode: '1-back',
+      intervalMode: 'fixed',
+      endingIntervalMs: 1000,
+    }));
+    e.dispose();
+  });
+
   it('pause() is no-op when not active', () => {
     const e = createEngine(makeSettings({ onboardingCompleted: true }));
     e.pause();
@@ -807,6 +881,36 @@ describe('State machine transitions', () => {
 // ── Settings persistence ───────────────────────────────────────────────────
 
 describe('Settings persistence', () => {
+  it('normalizes every numeric setting to finite positive bounds', () => {
+    const normalized = normalizeGameSettings({
+      ...makeSettings(),
+      timer: Number.NaN,
+      startingInterval: 0,
+      minimumInterval: 1e300,
+      adaptationStepMs: -1,
+    });
+
+    expect(normalized.timer).toBeGreaterThanOrEqual(DOCCT_SETTING_LIMITS.timer.min);
+    expect(normalized.timer).toBeLessThanOrEqual(DOCCT_SETTING_LIMITS.timer.max);
+    expect(normalized.startingInterval).toBeGreaterThanOrEqual(DOCCT_SETTING_LIMITS.interval.min);
+    expect(normalized.startingInterval).toBeLessThanOrEqual(DOCCT_SETTING_LIMITS.interval.max);
+    expect(normalized.minimumInterval).toBeGreaterThanOrEqual(DOCCT_SETTING_LIMITS.interval.min);
+    expect(normalized.minimumInterval).toBeLessThanOrEqual(normalized.startingInterval);
+    expect(normalized.adaptationStepMs).toBeGreaterThanOrEqual(DOCCT_SETTING_LIMITS.adaptationStep.min);
+    expect(normalized.adaptationStepMs).toBeLessThanOrEqual(DOCCT_SETTING_LIMITS.adaptationStep.max);
+    expect(Object.values(normalized).filter((value) => typeof value === 'number').every(Number.isFinite)).toBe(true);
+  });
+
+  it('normalizes interval pairs atomically when the minimum exceeds the start', () => {
+    const e = createEngine(makeSettings({ startingInterval: 3000, minimumInterval: 500 }));
+
+    e.updateSettings({ startingInterval: 800, minimumInterval: 5000 });
+
+    expect(e.getState().settings.startingInterval).toBe(800);
+    expect(e.getState().settings.minimumInterval).toBe(800);
+    expect(JSON.parse(localStorage.getItem('docct:settings:v1')!)).toEqual(e.getState().settings);
+    e.dispose();
+  });
   it('saves to localStorage on completeOnboarding', () => {
     const e = createEngine(makeSettings({ onboardingCompleted: false }));
     e.completeOnboarding();
@@ -826,7 +930,7 @@ describe('Settings persistence', () => {
     expect(s.taskMode).toBe('2-back');
     expect(s.voicePack).toBe('jenny');
     expect(s.startingInterval).toBe(5000);
-    expect(s.minimumInterval).toBe(300);
+    expect(s.minimumInterval).toBe(DOCCT_SETTING_LIMITS.interval.min);
     expect(s.onboardingCompleted).toBe(true);
     expect(s.intervalMode).toBe('adaptive');
     expect(s.adaptationMode).toBe('responsive');
@@ -937,7 +1041,7 @@ describe('Score calculation', () => {
     tickDigit(e); // 2nd → can answer
 
     // Submit correct
-    let h = e.getState().digitHistory;
+    const h = e.getState().digitHistory;
     e.submitAnswer(h[h.length - 2] + h[h.length - 1]);
     tickDigit(e); // checks
 

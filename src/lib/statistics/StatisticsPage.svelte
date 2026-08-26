@@ -220,7 +220,7 @@
           <span>Mode</span>
           <select class="select select-sm min-w-32" value={mode} on:change={(event) => changeMode(event.currentTarget.value)}>
             <option value="all">All modes</option>
-            {#each modeOptions as [key, label]}
+            {#each modeOptions as [key, label] (key)}
               <option value={key}>{label}</option>
             {/each}
           </select>
@@ -296,7 +296,7 @@
             <label class="stats-control">
               <span>Measure</span>
               <select class="select select-sm min-w-48" bind:value={metric}>
-                {#each metricOptions as key}
+                {#each metricOptions as key (key)}
                   <option value={key}>{METRICS[key].label}</option>
                 {/each}
               </select>
@@ -305,7 +305,7 @@
           <div>
             <span class="mb-1 block text-[0.7rem] opacity-60">Progress mode</span>
             <div class="inline-flex max-w-full flex-wrap gap-1 rounded-md border border-base-300 bg-base-200 p-1" role="group" aria-label="Progress mode">
-              {#each progressModeOptions as option}
+              {#each progressModeOptions as option (option.key)}
                 <button
                   type="button"
                   class="min-h-8 rounded-md px-3 py-1.5 text-sm font-medium"
@@ -339,7 +339,7 @@
         </div>
         {#if rollups.length}
           <div class="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
-            {#each rollups as rollup}
+            {#each rollups as rollup (`${rollup.source}:${rollup.label}`)}
               <div class="min-w-0">
                 <div class="mb-1 flex items-center justify-between gap-3 text-xs">
                   <span class="truncate">{rollup.label}</span>

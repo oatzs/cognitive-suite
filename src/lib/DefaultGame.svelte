@@ -11,6 +11,7 @@ import { feedback } from "../stores/feedbackStore"
 import { analytics } from "../stores/analyticsStore"
 import { mobile } from "../stores/mobileStore"
 import { isPlaying, gameDisplayInfo } from "../stores/gameRunningStore"
+import { createSessionController, SessionCancelledError } from "./sessionController"
 
 let trials
 let currentTrial
@@ -18,12 +19,12 @@ let nextTrial
 let trialsIndex
 let scoresheet = []
 let presentation
-let timeoutCancelFns
 let gameMeta = {}
+let sessionSettings = {}
 let gameId = 0
+let controller
 
 const resetRuntimeData = () => {
-  isPlaying.set(false)
   gameDisplayInfo.set({})
   trials = []
   currentTrial = {}
@@ -31,8 +32,8 @@ const resetRuntimeData = () => {
   trialsIndex = 0
   scoresheet = []
   presentation = { highlight: false }
-  timeoutCancelFns = []
   gameMeta = {}
+  sessionSettings = {}
   gameId++
 }
 
@@ -49,10 +50,10 @@ $: isMobile = $mobile
 $: gameSettings = $settings.gameSettings[$settings.mode]
 $: game = generateGame(gameSettings, $settings, gameId)
 $: applyGame(game, $isPlaying)
-$: trialDisplay = $settings.feedback === 'show' ? game.trials.length - trialsIndex : ''
+$: trialDisplay = $settings.feedback === 'show' ? ($isPlaying ? trials.length : game.trials.length) - trialsIndex : ''
 
 const playTrial = async (i) => {
-  if (!$isPlaying) {
+  if (controller.phase() !== 'active') {
     return
   }
 
@@ -65,8 +66,8 @@ const playTrial = async (i) => {
   selectTrial(i)
   presentation.highlight = true
   const audioWait = currentTrial.audio ? makeCancellable(audioPlayer.play(currentTrial.audio)) : Promise.resolve()
-  const presentationWait = delay(Math.min(2000, $gameDisplayInfo.trialTime - 350)).then(() => presentation.highlight = false)
-  const trialWait = delay($gameDisplayInfo.trialTime)
+  const presentationWait = delay(Math.min(2000, gameMeta.trialTime - 350)).then(() => presentation.highlight = false)
+  const trialWait = delay(gameMeta.trialTime)
   await Promise.all([audioWait, presentationWait, trialWait])
   detectMissedStimuli()
   await playTrial(i + 1)
@@ -81,13 +82,11 @@ const selectTrial = (i) => {
 }
 
 const startGame = async () => {
-  if ($isPlaying) {
-    return
-  }
-  isPlaying.set(true)
-  gameMeta = { ...game.meta, start: Date.now() }
+  if (!controller.begin()) return
+  sessionSettings = structuredClone($settings)
+  gameMeta = { ...structuredClone(game.meta), start: Date.now(), rotationSpeed: sessionSettings.rotationSpeed }
   gameDisplayInfo.set(gameMeta)
-  audioPlayer.cacheAudioSource(gameSettings.audioSource)
+  audioPlayer.cacheAudioSource(sessionSettings.gameSettings[sessionSettings.mode].audioSource)
   trials = structuredClone(game.trials)
   nextTrial = trials[0]
   scoresheet = new Array(trials.length).fill().map(() => ({}))
@@ -96,32 +95,39 @@ const startGame = async () => {
     await delay(700)
     await playTrial(0)
   } catch (e) {
-    if (e.message === 'Game cancelled') {
+    if (e instanceof SessionCancelledError) {
       console.debug('Game cancelled', e)
     } else {
+      await controller.finish('cancelled')
       throw e
     }
   }
 }
 
-const endGame = async (status) => {
-  if (!$isPlaying) {
-    return
-  }
-
+const finalizeGame = async (status) => {
   const gameInfoRecord = { ...gameMeta, timestamp: Date.now() }
   if (trialsIndex > gameInfoRecord.nBack) {
     await analytics.scoreTrials(gameInfoRecord, status === 'completed' ? scoresheet : scoresheet.slice(0, trialsIndex), status)
     if (status === 'completed') {
-      await runAutoProgression(gameInfoRecord)
+      await runAutoProgression(gameInfoRecord, sessionSettings)
     }
   } else {
     console.debug('Game not recorded', trialsIndex, gameInfoRecord, scoresheet, trials)
   }
-  timeoutCancelFns.forEach(fn => fn())
+}
+
+const cleanupGame = () => {
   resetRuntimeData()
   feedback.reset()
 }
+
+controller = createSessionController({
+  setRunning: (running) => isPlaying.set(running),
+  finalize: finalizeGame,
+  cleanup: cleanupGame,
+})
+
+const endGame = (status) => controller.finish(status)
 
 const toggleGame = () => {
   if ($isPlaying) {
@@ -159,40 +165,9 @@ const checkForMatch = (type) => {
   }
 }
 
-const delay = async (ms) => {
-  let timeoutId
-  let rejectFn
+const delay = (ms) => controller.delay(ms)
 
-  const promise = new Promise((resolve, reject) => {
-    rejectFn = reject
-    timeoutId = setTimeout(resolve, ms)
-  })
-
-  const cancel = () => {
-    if (timeoutId !== undefined) {
-      clearTimeout(timeoutId)
-      rejectFn(new Error('Game cancelled'))
-      timeoutId = undefined
-    }
-  }
-
-  timeoutCancelFns.push(cancel)
-
-  return promise
-}
-
-const makeCancellable = (originalPromise) => {
-  let cancelFn
-
-  const wrappedPromise = new Promise((resolve, reject) => {
-    cancelFn = () => reject(new Error('Game cancelled'))
-    originalPromise.then(resolve, reject)
-  })
-
-  timeoutCancelFns.push(cancelFn)
-
-  return wrappedPromise
-}
+const makeCancellable = (originalPromise) => controller.track(originalPromise)
 
 const handleKey = (event) => {
   switch (event.code) {
@@ -204,7 +179,7 @@ const handleKey = (event) => {
       break
   }
 
-  const hotkeys = $settings.hotkeys
+  const hotkeys = $isPlaying ? sessionSettings.hotkeys : $settings.hotkeys
   for (const [action, key] of Object.entries(hotkeys)) {
     if (key.toUpperCase() === event.key.toUpperCase()) {
       checkForMatch(action)
@@ -221,15 +196,15 @@ const suppressKey = (event) => {
 
 document.addEventListener('keydown', handleKey)
 
-onDestroy(async () => {
-  await endGame('cancelled')
+onDestroy(() => {
   document.removeEventListener('keydown', handleKey)
+  void endGame('cancelled')
 })
 
 </script>
 
 
-<Grid trial={currentTrial} {nextTrial} {presentation} {gameId} />
+<Grid trial={currentTrial} {nextTrial} {presentation} />
 {#if isMobile}
 <div class="stretch grid grid-rows-[1fr_7fr_2fr] md:grid-rows-[1fr_8fr_2fr] gap-1">
   <div class="w-full h-full flex items-center justify-between row-start-1 p-8">
@@ -263,13 +238,13 @@ onDestroy(async () => {
     >{#if $isPlaying} Stop {:else} Play {/if}</button>
   </div>
   <div class="game-button-lg-group row-start-2 col-start-1 pr-24">
-    {#if !gameSettings.enableImage}
+    {#if !$gameDisplayInfo.tags?.includes('image')}
     <LargeKey field="color" display="Color" isPlaying={$isPlaying} {checkForMatch}></LargeKey>
     {/if}
     <LargeKey field="position" display="Position" isPlaying={$isPlaying} {checkForMatch}></LargeKey>
   </div>
   <div class="game-button-lg-group row-start-2 col-start-4 pl-24">
-    {#if gameSettings.enableImage}
+    {#if $gameDisplayInfo.tags?.includes('image')}
     <LargeKey field="image" display="Image" isPlaying={$isPlaying} {checkForMatch}></LargeKey>
     {:else}
     <LargeKey field="shape" display="Shape" isPlaying={$isPlaying} {checkForMatch}></LargeKey>

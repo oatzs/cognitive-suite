@@ -1,11 +1,21 @@
 import 'fake-indexeddb/auto'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import fc from 'fast-check'
 import {
   addDocctSession,
   addImportedGames,
   deleteDB,
   getAllCompletedGames,
 } from '../src/lib/gamedb.js'
+import { parseSessionBackup, serializeSessionBackup } from '../src/lib/sessionBackup.js'
+import {
+  getModalityRollups,
+  groupDaily,
+  METRICS,
+  normalizeGames,
+  sessionsToCsv,
+  summarizeSessions,
+} from '../src/lib/statistics/stats.js'
 
 const game = (sessionId, timestamp) => ({
   sessionId,
@@ -67,5 +77,120 @@ describe('imported game persistence', () => {
       sessionId: `docct:${completedAt}`,
     })).resolves.toBe(false)
     await expect(getAllCompletedGames()).resolves.toHaveLength(1)
+  })
+
+  it('can store, normalize, summarize, display, and export every generated accepted backup', async () => {
+    const timestampArbitrary = fc.integer({ min: 1_600_000_000_000, max: 4_102_444_800_000 })
+    const baseArbitrary = fc.record({
+      sessionId: fc.uuid(),
+      timestamp: timestampArbitrary,
+      nBack: fc.integer({ min: 1, max: 12 }),
+    })
+    const quadArbitrary = fc.record({
+      base: baseArbitrary,
+      hits: fc.integer({ min: 0, max: 100 }),
+      misses: fc.integer({ min: 0, max: 100 }),
+      trialTime: fc.integer({ min: 500, max: 5000 }),
+    }).map(({ base, hits, misses, trialTime }) => ({
+      ...base,
+      source: 'quad-box',
+      status: 'completed',
+      title: 'dual',
+      mode: 'dual',
+      variant: 'dual',
+      tags: ['position'],
+      scores: { position: { hits, misses, possible: hits + misses } },
+      completedTrials: hits + misses,
+      trialTime,
+    }))
+    const tallyArbitrary = fc.record({
+      base: baseArbitrary,
+      hits: fc.integer({ min: 0, max: 100 }),
+      misses: fc.integer({ min: 0, max: 100 }),
+    }).map(({ base, hits, misses }) => {
+      const possible = hits + misses
+      const completedTrials = possible + base.nBack
+      return {
+        ...base,
+        source: 'quad-box',
+        start: base.timestamp - Math.max(1, completedTrials) * 1000,
+        status: 'completed',
+        title: 'tally dual',
+        mode: 'tally',
+        variant: 'tally dual',
+        tags: ['position0'],
+        scores: { tally: { hits, misses: 0, possible } },
+        completedTrials: Math.max(1, completedTrials),
+      }
+    })
+    const docctArbitrary = fc.record({
+      base: baseArbitrary,
+      correctCount: fc.integer({ min: 0, max: 100 }),
+      wrongCount: fc.integer({ min: 0, max: 100 }),
+      durationSec: fc.integer({ min: 0, max: 3600 }),
+      endingIntervalMs: fc.integer({ min: 500, max: 5000 }),
+    }).map(({ base, correctCount, wrongCount, durationSec, endingIntervalMs }) => {
+      const totalAnswers = correctCount + wrongCount
+      const completedAt = new Date(base.timestamp).toISOString()
+      return {
+        ...base,
+        source: 'docct',
+        timestamp: base.timestamp,
+        start: base.timestamp - durationSec * 1000,
+        status: 'completed',
+        title: 'docct 1-back',
+        mode: 'docct',
+        variant: '1-back',
+        nBack: 1,
+        tags: ['answer'],
+        scores: { answer: { hits: correctCount, misses: wrongCount, possible: totalAnswers } },
+        completedTrials: totalAnswers,
+        trialTime: endingIntervalMs,
+        docct: {
+          sessionId: base.sessionId,
+          completedAt,
+          mode: '1-back',
+          intervalMode: 'adaptive',
+          adaptationMode: 'responsive',
+          adaptationStepMs: 100,
+          durationSec,
+          accuracy: totalAnswers > 0 ? correctCount / totalAnswers : 0,
+          fastestIntervalMs: endingIntervalMs,
+          endingIntervalMs,
+          averageResponseTimeMs: 250,
+          correctCount,
+          totalAnswers,
+          streaks: 0,
+          useVoice: false,
+          useKeypad: true,
+        },
+      }
+    })
+    const sessionsArbitrary = fc.uniqueArray(
+      fc.oneof(quadArbitrary, tallyArbitrary, docctArbitrary),
+      { selector: (session) => session.sessionId, maxLength: 8 },
+    )
+
+    await fc.assert(fc.asyncProperty(sessionsArbitrary, async (sessions) => {
+      await deleteDB()
+      try {
+        const parsed = parseSessionBackup(serializeSessionBackup(sessions, '2026-08-26T12:00:00.000Z'))
+        await addImportedGames(parsed.games)
+        const stored = await getAllCompletedGames()
+        const normalized = normalizeGames(stored)
+
+        expect(stored).toHaveLength(sessions.length)
+        expect(normalized).toHaveLength(sessions.length)
+        expect(() => summarizeSessions(normalized)).not.toThrow()
+        expect(() => getModalityRollups(normalized)).not.toThrow()
+        for (const metric of Object.keys(METRICS)) {
+          expect(() => groupDaily(normalized, metric)).not.toThrow()
+        }
+        expect(() => sessionsToCsv(normalized)).not.toThrow()
+        expect(() => serializeSessionBackup(stored, '2026-08-26T12:00:00.000Z')).not.toThrow()
+      } finally {
+        await deleteDB()
+      }
+    }), { numRuns: 50 })
   })
 })

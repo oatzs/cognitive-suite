@@ -74,16 +74,26 @@
 {/if}
 <style>
   .cell {
-    @apply absolute w-[20.1svmin] h-[20.1svmin] left-[20.1svmin] top-[20.1svmin];
+    position: absolute;
+    width: 20.1svmin;
+    height: 20.1svmin;
+    left: 20.1svmin;
+    top: 20.1svmin;
     transform-style: preserve-3d;
   }
 
   .cell2d {
-    @apply absolute w-[27.1svmin] h-[27.1svmin] left-[27.1svmin] top-[27.1svmin];
+    position: absolute;
+    width: 27.1svmin;
+    height: 27.1svmin;
+    left: 27.1svmin;
+    top: 27.1svmin;
   }
 
   .face {
-    @apply absolute w-full h-full;
+    position: absolute;
+    width: 100%;
+    height: 100%;
     background-color: var(--face-bg-color);
     background-image: var(--shape-url);
     opacity: var(--face-opacity, 1.0);

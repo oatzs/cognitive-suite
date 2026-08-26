@@ -30,7 +30,7 @@
 
 <div class="overflow-x-auto pb-1">
   <div class="activity-grid min-w-max" aria-label="Training activity for the last year">
-    {#each cells as cell}
+    {#each cells as cell (cell.day)}
       <span
         class="activity-cell activity-level-{cell.level}"
         title={`${cell.day}: ${Math.round(cell.minutes)} minutes`}

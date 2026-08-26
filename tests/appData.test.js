@@ -1,0 +1,38 @@
+import { describe, expect, it, vi } from 'vitest'
+import { createAppDataRepository } from '../src/lib/appData.js'
+import { DOCCT_STORAGE_KEYS } from '../src/lib/docct/persistence.js'
+
+describe('app data repository', () => {
+  it('resets IndexedDB, Quad Box settings, and all current and legacy DocCT data', async () => {
+    const storageValues = new Map(DOCCT_STORAGE_KEYS.map((key) => [key, 'saved']))
+    storageValues.set('unrelated', 'keep')
+    const storage = {
+      removeItem: vi.fn((key) => storageValues.delete(key)),
+    }
+    const deleteGames = vi.fn().mockResolvedValue(undefined)
+    const resetQuadSettings = vi.fn()
+    const repository = createAppDataRepository({ deleteGames, resetQuadSettings, storage })
+
+    await repository.resetAll()
+
+    expect(deleteGames).toHaveBeenCalledTimes(1)
+    expect(resetQuadSettings).toHaveBeenCalledTimes(1)
+    expect([...storageValues.keys()]).toEqual(['unrelated'])
+    expect(storage.removeItem.mock.calls.map(([key]) => key)).toEqual(DOCCT_STORAGE_KEYS)
+  })
+
+  it('does not report a reset or change settings if IndexedDB deletion fails', async () => {
+    const failure = new Error('database busy')
+    const resetQuadSettings = vi.fn()
+    const storage = { removeItem: vi.fn() }
+    const repository = createAppDataRepository({
+      deleteGames: vi.fn().mockRejectedValue(failure),
+      resetQuadSettings,
+      storage,
+    })
+
+    await expect(repository.resetAll()).rejects.toBe(failure)
+    expect(resetQuadSettings).not.toHaveBeenCalled()
+    expect(storage.removeItem).not.toHaveBeenCalled()
+  })
+})

@@ -51,6 +51,7 @@ export class NBackGame {
                   ({ nBack, numTrials, trialTime, matchChance, interference, rules }))(this.gameSettings)
 
     meta = { ...meta, title, tags }
+    if (this.gameSettings.grid) meta.grid = this.gameSettings.grid
     if (this.tallyStimuli.size > 0) {
       meta = { ...meta,
         mode: 'tally',

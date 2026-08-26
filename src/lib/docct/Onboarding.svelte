@@ -3,7 +3,6 @@
   import { onMount } from 'svelte';
 
   let { engine }: { engine: Engine } = $props();
-  let dialogEl: HTMLElement;
   let continueButton: HTMLButtonElement;
 
   onMount(() => {
@@ -33,7 +32,6 @@
 <div class="fixed inset-0 z-20 overflow-y-auto bg-black/75 p-4 md:flex md:items-center md:justify-center md:p-6">
   <div class="flex min-h-full flex-col justify-center md:min-h-0 md:w-full md:max-w-5xl">
     <div
-      bind:this={dialogEl}
       role="dialog"
       aria-modal="true"
       aria-labelledby="onboarding-title"
@@ -50,9 +48,7 @@
       </p>
 
       <div class="flex justify-stretch md:justify-end">
-        <!-- svelte-ignore a11y_autofocus: required initial focus inside this modal -->
         <button
-          autofocus
           bind:this={continueButton}
           class="flex min-h-11 w-full cursor-pointer items-center justify-center gap-6 rounded-full border bg-[#10b981] px-8 py-3 hover:opacity-75 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:w-auto"
           onclick={continueToSetup}

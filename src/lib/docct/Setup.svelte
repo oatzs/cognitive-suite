@@ -104,7 +104,7 @@
           <div class="flex overflow-hidden rounded-xl">
             <input aria-label="Duration in minutes" class="bg-[#0f121a] p-2 text-center text-xl font-medium text-white [appearance:textfield] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#10b981] focus-visible:ring-inset w-[100px] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" type="text" inputmode="decimal" spellcheck="false" value={(state.settings.timer / 60).toFixed(2).replace(/\.?0+$/, "")} onchange={(e) => handleDuration(parseFloat((e.target as HTMLInputElement).value))} onkeydown={(e) => { if (e.key === "Escape") { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }} />
             <div class="flex gap-2 bg-[#0f121a] p-2 pl-0">
-              {#each [5, 10, 15, 30, 60] as preset}
+              {#each [5, 10, 15, 30, 60] as preset (preset)}
                 <button type="button" aria-label={`Set duration to ${preset} minutes`} class="cursor-pointer bg-[#a9b4cc] p-2 rounded-md" onmousedown={(e) => e.preventDefault()} onclick={() => handleDuration(preset)}>
                   <span class="text-[#0f121a] text-sm font-bold">{preset}</span>
                 </button>
@@ -119,7 +119,7 @@
           <div class="flex overflow-hidden rounded-xl">
             <input aria-label={state.settings.intervalMode === 'fixed' ? 'Fixed interval in seconds' : 'Starting interval in seconds'} class="bg-[#0f121a] p-2 text-center text-xl font-medium text-white [appearance:textfield] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#10b981] focus-visible:ring-inset w-[100px] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" type="text" inputmode="decimal" spellcheck="false" value={(state.settings.startingInterval / 1000).toFixed(2).replace(/\.?0+$/, "")} onchange={(e) => handleStartingInterval(parseFloat((e.target as HTMLInputElement).value))} onkeydown={(e) => { if (e.key === "Escape") { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }} />
             <div class="flex gap-2 bg-[#0f121a] p-2 pl-0">
-              {#each [0.5, 1, 2, 3, 5] as preset}
+              {#each [0.5, 1, 2, 3, 5] as preset (preset)}
                 <button type="button" aria-label={`Set interval to ${preset} seconds`} class="cursor-pointer bg-[#a9b4cc] p-2 rounded-md" onmousedown={(e) => e.preventDefault()} onclick={() => handleStartingInterval(preset)}>
                   <span class="text-[#0f121a] text-sm font-bold">{preset}</span>
                 </button>
@@ -135,7 +135,7 @@
             <div class="flex overflow-hidden rounded-xl">
               <input aria-label="Minimum interval in seconds" class="bg-[#0f121a] p-2 text-center text-xl font-medium text-white [appearance:textfield] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#10b981] focus-visible:ring-inset w-[100px] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" type="text" inputmode="decimal" spellcheck="false" value={(state.settings.minimumInterval / 1000).toFixed(2).replace(/\.?0+$/, "")} onchange={(e) => handleMinimumInterval(parseFloat((e.target as HTMLInputElement).value))} onkeydown={(e) => { if (e.key === "Escape") { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }} />
               <div class="flex gap-2 bg-[#0f121a] p-2 pl-0">
-                {#each [0.5, 1, 2, 3, 5] as preset}
+                {#each [0.5, 1, 2, 3, 5] as preset (preset)}
                   <button type="button" aria-label={`Set minimum interval to ${preset} seconds`} class="cursor-pointer bg-[#a9b4cc] p-2 rounded-md" onmousedown={(e) => e.preventDefault()} onclick={() => handleMinimumInterval(preset)}>
                     <span class="text-[#0f121a] text-sm font-bold">{preset}</span>
                   </button>

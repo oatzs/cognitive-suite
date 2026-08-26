@@ -4,4 +4,4 @@
   $: classes = `absolute w-full h-full ${$$props.class}`
 </script>
 
-<img src={frameSrc} class={classes}>
+<img src={frameSrc} class={classes} alt="">

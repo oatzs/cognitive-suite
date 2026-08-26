@@ -1,7 +1,8 @@
 <script>
   import { CircleHelp } from '@lucide/svelte'
   import { settings } from '../stores/settingsStore'
-  import { deleteDB } from './gamedb'
+  import { isPlaying } from '../stores/gameRunningStore'
+  import { appDataRepository } from './appData'
 
   let show = false
   let tab = 'how-to-play'
@@ -20,46 +21,52 @@
     if (event.key === "Escape") closeModal()
   }
 
-  const handleBackdropClick = (event) => {
-    if (event.target.classList.contains('modal')) closeModal()
-  }
-
   const resetSettings = () => {
+    if ($isPlaying) return
     settings.reset()
     alert("Settings reset to default.")
     show = false
   }
 
   const resetAll = async () => {
+    if ($isPlaying || isDeleting) return
     isDeleting = true
-    await deleteDB()
-    settings.reset()
-    isDeleting = false
-    alert("App fully reset.")
-    confirmResetAll = false
-    show = false
+    try {
+      await appDataRepository.resetAll()
+      alert("App fully reset.")
+      confirmResetAll = false
+      show = false
+    } catch (reason) {
+      alert(reason?.message || 'Could not reset the app. No settings were changed.')
+    } finally {
+      isDeleting = false
+    }
   }
 </script>
 
+<svelte:window on:keydown={handleKeydown} />
 <button class="flex items-center justify-center" on:click={openModal}>
   <CircleHelp class="btn btn-square btn-ghost h-8 lg:h-6" />
 </button>
 {#if show}
-  <div class="modal modal-open whitespace-normal" on:click={handleBackdropClick} on:keydown={handleKeydown} tabindex="0">
-    <div class="modal-box help-box w-[90%] max-w-3xl">
+  <div class="modal modal-open whitespace-normal" role="dialog" aria-modal="true" aria-label="Help and app reset">
+    <button type="button" class="fixed inset-0 cursor-default" aria-label="Close help" on:click={closeModal}></button>
+    <div class="modal-box help-box relative w-[90%] max-w-3xl">
       <div role="tablist" class="tabs tabs-lift relative">
-        <a role="tab"
+        <button type="button" role="tab"
+          aria-selected={tab === 'how-to-play'}
           class="tab"
           class:tab-active={tab === 'how-to-play'}
           on:click={() => tab = 'how-to-play'}>
           How to Play
-        </a>
-        <a role="tab"
+        </button>
+        <button type="button" role="tab"
+          aria-selected={tab === 'misc'}
           class="tab"
           class:tab-active={tab === 'misc'}
           on:click={() => tab = 'misc'}>
           Reset App
-        </a>
+        </button>
       </div>
       {#if tab === 'how-to-play'}
       <div class="prose max-w-none text-gray-800 dark:text-gray-200 text-sm sm:text-base md:text-lg overflow-y-auto h-[70svh] mt-2">
@@ -97,11 +104,11 @@
           <p class="text-sm">
             This will not affect your game history or performance data.
           </p>
-          <button class="btn btn-info mt-4 text-xl" on:click={resetSettings}>
+          <button class="btn btn-info mt-4 text-xl" on:click={resetSettings} disabled={$isPlaying}>
             Reset Settings
           </button>
         </div>
-        <div class="divider" />
+        <div class="divider"></div>
         <div>
           <p class="mb-2 text-red-600 dark:text-rose-500 font-semibold">Danger Zone</p>
           <p class="text-sm">
@@ -109,13 +116,13 @@
           </p>
 
           {#if !confirmResetAll}
-            <button class="btn btn-error mt-4 text-xl dark:bg-rose-500" on:click={() => confirmResetAll = true}>
+            <button class="btn btn-error mt-4 text-xl dark:bg-rose-500" on:click={() => confirmResetAll = true} disabled={$isPlaying}>
               Reset Entire App
             </button>
           {:else}
             <div class="mt-4 space-y-2">
               <p class="text-sm text-red-600 dark:text-rose-500 font-medium">Are you absolutely sure?</p>
-              <button class="btn btn-error dark:bg-rose-500 w-full" on:click={() => resetAll()}>
+              <button class="btn btn-error dark:bg-rose-500 w-full" on:click={() => resetAll()} disabled={$isPlaying || isDeleting}>
                 Yes, erase everything
                 {#if isDeleting}
                   <span class="loading loading-spinner"></span>
@@ -131,8 +138,8 @@
       {/if}
       <div class="modal-action flex flex-row-reverse items-center justify-between mt-2">
         <button class="btn" on:click={closeModal}>Close</button>
-        <a class="link" href="https://ko-fi.com/soasoa" target="_blank">Donate☕</a>
-        <a class="link" href="https://github.com/soamsy/quad-box" target="_blank">Github</a>
+        <a class="link" href="https://ko-fi.com/soasoa" target="_blank" rel="noreferrer">Donate☕</a>
+        <a class="link" href="https://github.com/soamsy/quad-box" target="_blank" rel="noreferrer">Github</a>
       </div>
     </div>
   </div>

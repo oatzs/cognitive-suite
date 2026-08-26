@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Engine, GameState, SessionResult } from './engine';
+  import type { Engine, GameState } from './engine';
   import { onDestroy, onMount, untrack } from 'svelte';
 
   let { engine, close, restoreFocusTo }: { engine: Engine; close: () => void; restoreFocusTo: HTMLElement | null } = $props();
@@ -80,7 +80,7 @@
     accuracyChart = new Chart(chartCanvas, {
       type: 'line',
       data: {
-        labels: sessions.map((_, i) => ''),
+        labels: sessions.map(() => ''),
         datasets: [{
           data: sessions.map(s => Math.round(s.accuracy * 100)),
           borderColor: '#10b981',
@@ -113,7 +113,7 @@
       intervalChart = new Chart(intervalChartCanvas, {
         type: 'line',
         data: {
-          labels: sessions.map((_, i) => ''),
+          labels: sessions.map(() => ''),
           datasets: [{
             data: sessions.map(s => s.fastestIntervalMs),
             borderColor: '#10b981',
@@ -167,7 +167,6 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div class="bg-black/80 fixed inset-0 z-3 flex items-center justify-center">
   <button tabindex="-1" class="absolute inset-0 cursor-default" aria-label="Close history" onclick={close}></button>
   <div
@@ -177,7 +176,6 @@
     aria-labelledby="history-title"
     tabindex="-1"
     class="bg-[#0f121a] rounded-[24px] p-6 max-w-[600px] w-full mx-4 max-h-[80vh] overflow-y-auto border border-[#a9b4cc] outline-none focus-visible:ring-2 focus-visible:ring-[#10b981]"
-    onclick={(e) => e.stopPropagation()}
     onkeydown={handleDialogKeydown}
   >
     <!-- Header -->
@@ -213,7 +211,7 @@
 
       <!-- Session list -->
       <div class="order-1 mb-6 flex flex-col gap-2 md:order-3 md:mb-0">
-        {#each state.history as session}
+        {#each state.history as session (session.sessionId)}
           <div class="bg-[#121621] rounded-xl p-4 flex flex-col gap-2">
             <div class="flex items-center justify-between">
               <span class="text-[#7e889c] text-xs">{formatDate(session.completedAt)}</span>

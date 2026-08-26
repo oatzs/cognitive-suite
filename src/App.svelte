@@ -4,8 +4,6 @@ import DefaultGame from "./lib/DefaultGame.svelte"
 import TallyGame from "./lib/TallyGame.svelte"
 import ErrorDisplay from "./lib/ErrorDisplay.svelte"
 import SuiteNav from "./lib/SuiteNav.svelte"
-import DocctApp from "./lib/docct/DocctApp.svelte"
-import StatisticsPage from "./lib/statistics/StatisticsPage.svelte"
 import { settings } from "./stores/settingsStore"
 import { setMobile } from "./stores/mobileStore"
 import { isPlaying } from "./stores/gameRunningStore"
@@ -16,16 +14,28 @@ import { onMount, onDestroy } from "svelte"
 $: theme = $settings.theme === 'dark' ? 'black' : 'bumblebee'
 let view = 'quad-box'
 let docctActive = false
+let renderedQuadMode = $settings.mode
+let optionalViewPromise = null
+const optionalViews = new Map()
 $: navigationLocked = $isPlaying || docctActive
+$: if (!$isPlaying) renderedQuadMode = $settings.mode
 $: pageTitle = view === 'docct' ? 'DocCT' : view === 'statistics' ? 'Statistics' : 'Quad Box'
 
 const navigate = (nextView) => {
   if (navigationLocked && nextView !== view) return
   view = nextView
+  if (nextView === 'docct' || nextView === 'statistics') {
+    if (!optionalViews.has(nextView)) {
+      optionalViews.set(nextView, nextView === 'docct'
+        ? import('./lib/docct/DocctApp.svelte')
+        : import('./lib/statistics/StatisticsPage.svelte'))
+    }
+    optionalViewPromise = optionalViews.get(nextView)
+  }
 }
 
 const persistDocctSession = (session) => {
-  addDocctSession(session).catch((reason) => {
+  return addDocctSession(session).catch((reason) => {
     error.set({
       message: reason?.message || 'Could not save the DocCT session',
       stacktrace: reason?.stack || reason,
@@ -81,7 +91,7 @@ onDestroy(async () => {
     {#if view === 'quad-box'}
       <main class="h-full">
         <Drawer>
-          {#if $settings.mode === 'tally' || $settings.mode === 'vtally' || $settings.mode === 'atally'}
+          {#if renderedQuadMode === 'tally' || renderedQuadMode === 'vtally' || renderedQuadMode === 'atally'}
             <TallyGame />
           {:else}
             <DefaultGame />
@@ -89,9 +99,21 @@ onDestroy(async () => {
         </Drawer>
       </main>
     {:else if view === 'docct'}
-      <DocctApp onActiveChange={(active) => docctActive = active} onSessionComplete={persistDocctSession} />
+      {#await optionalViewPromise}
+        <div class="flex h-full items-center justify-center"><span class="loading loading-spinner loading-lg"></span></div>
+      {:then module}
+        <svelte:component this={module.default} onActiveChange={(active) => docctActive = active} onSessionComplete={persistDocctSession} />
+      {:catch reason}
+        <div class="p-6 text-error">{reason?.message || 'Could not load DocCT'}</div>
+      {/await}
     {:else}
-      <StatisticsPage />
+      {#await optionalViewPromise}
+        <div class="flex h-full items-center justify-center"><span class="loading loading-spinner loading-lg"></span></div>
+      {:then module}
+        <svelte:component this={module.default} />
+      {:catch reason}
+        <div class="p-6 text-error">{reason?.message || 'Could not load statistics'}</div>
+      {/await}
     {/if}
   </div>
 </div>

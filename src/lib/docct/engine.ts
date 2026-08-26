@@ -1,4 +1,20 @@
 import { createSessionId } from '../sessionId.js';
+import {
+  DOCCT_HIGH_SCORES_KEY,
+  DOCCT_HISTORY_KEY,
+  DOCCT_SETTINGS_KEY,
+  LEGACY_DOCCT_HIGH_SCORES_KEY,
+  LEGACY_DOCCT_HISTORY_KEY,
+  LEGACY_DOCCT_SETTINGS_KEY,
+  readDocctValue,
+  writeDocctValue,
+} from './persistence.js';
+
+export {
+  DOCCT_HIGH_SCORES_KEY,
+  DOCCT_HISTORY_KEY,
+  DOCCT_SETTINGS_KEY,
+} from './persistence.js';
 
 // DOCCT Game Engine — Pure logic with Web Audio API
 // Forensically matched to the original at docct.pages.dev
@@ -42,7 +58,7 @@ export interface SessionResult {
 }
 
 export interface GameState {
-  phase: 'onboarding' | 'setup' | 'active' | 'paused' | 'complete';
+  phase: 'onboarding' | 'setup' | 'active' | 'paused' | 'ending' | 'complete';
   currentDigit: number | null;
   canAnswer: boolean;
   isPlayingAudio: boolean;
@@ -76,19 +92,13 @@ export interface Engine {
   submitAnswer(answer: number): void;
   completeOnboarding(): void;
   showOnboarding(): void;
-  updateSettings(s: Partial<GameSettings>): void;
+  updateSettings(s: Partial<GameSettings>): boolean;
   loadHistory(): SessionResult[];
   dispose(): void;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-export const DOCCT_SETTINGS_KEY = 'docct:settings:v1';
-export const DOCCT_HISTORY_KEY = 'docct:session-history:v1';
-export const DOCCT_HIGH_SCORES_KEY = 'docct:high-scores:v1';
-const LEGACY_SETTINGS_KEY = 'settings';
-const LEGACY_HISTORY_KEY = 'sessionHistory';
-const LEGACY_HIGH_SCORES_KEY = 'highScores';
 const STREAK_THRESHOLD = 3; // correct/wrong streak needed to change interval
 
 /**
@@ -100,7 +110,13 @@ function adaptationStep(current: number, mode: GameSettings['adaptationMode'], s
 }
 const INITIAL_DELAY = 500; // ms before first digit (matches original)
 
-const DEFAULT_SETTINGS: GameSettings = {
+export const DOCCT_SETTING_LIMITS = {
+  timer: { min: 1, max: 86_400 },
+  interval: { min: 500, max: 60_000 },
+  adaptationStep: { min: 50, max: 500 },
+} as const;
+
+export const DEFAULT_SETTINGS: GameSettings = {
   timer: 600,
   useVoice: true,
   useKeypad: true,
@@ -123,29 +139,69 @@ function generateDigit(): number {
   return Math.floor(Math.random() * 9) + 1;
 }
 
+function boundedNumber(
+  value: unknown,
+  fallback: number,
+  { min, max }: { min: number; max: number },
+  integer = false,
+): number {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return fallback;
+  const bounded = Math.min(max, Math.max(min, number));
+  return integer ? Math.round(bounded) : bounded;
+}
+
+export function normalizeGameSettings(
+  candidate: Partial<GameSettings> = {},
+  fallback: GameSettings = DEFAULT_SETTINGS,
+): GameSettings {
+  const startingInterval = boundedNumber(
+    candidate.startingInterval,
+    fallback.startingInterval,
+    DOCCT_SETTING_LIMITS.interval,
+  );
+  const requestedMinimum = boundedNumber(
+    candidate.minimumInterval,
+    Math.min(fallback.minimumInterval, startingInterval),
+    DOCCT_SETTING_LIMITS.interval,
+  );
+
+  return {
+    timer: boundedNumber(candidate.timer, fallback.timer, DOCCT_SETTING_LIMITS.timer, true),
+    useVoice: candidate.useVoice === undefined ? fallback.useVoice : Boolean(candidate.useVoice),
+    useKeypad: candidate.useKeypad === undefined ? fallback.useKeypad : Boolean(candidate.useKeypad),
+    keypadLayout: candidate.keypadLayout === 'sequential' ? 'sequential'
+      : candidate.keypadLayout === 'classic' ? 'classic' : fallback.keypadLayout,
+    displayMode: candidate.displayMode === 'focus' ? 'focus'
+      : candidate.displayMode === 'standard' ? 'standard' : fallback.displayMode,
+    voicePack: candidate.voicePack === 'rose_fast' || candidate.voicePack === 'jenny' || candidate.voicePack === 'rose'
+      ? candidate.voicePack : fallback.voicePack,
+    wrongSound: candidate.wrongSound === 'none' || candidate.wrongSound === 'fart' || candidate.wrongSound === 'beep'
+      ? candidate.wrongSound : fallback.wrongSound,
+    startingInterval,
+    minimumInterval: Math.min(requestedMinimum, startingInterval),
+    intervalMode: candidate.intervalMode === 'fixed' ? 'fixed'
+      : candidate.intervalMode === 'adaptive' ? 'adaptive' : fallback.intervalMode,
+    adaptationMode: candidate.adaptationMode === 'classic' ? 'classic'
+      : candidate.adaptationMode === 'responsive' ? 'responsive' : fallback.adaptationMode,
+    adaptationStepMs: boundedNumber(
+      candidate.adaptationStepMs,
+      fallback.adaptationStepMs,
+      DOCCT_SETTING_LIMITS.adaptationStep,
+    ),
+    onboardingCompleted: candidate.onboardingCompleted === undefined
+      ? fallback.onboardingCompleted : Boolean(candidate.onboardingCompleted),
+    taskMode: candidate.taskMode === '2-back' || candidate.taskMode === 'variable' || candidate.taskMode === '1-back'
+      ? candidate.taskMode : fallback.taskMode,
+  };
+}
+
 function loadSettingsFromStorage(): GameSettings {
   if (typeof localStorage === 'undefined') return { ...DEFAULT_SETTINGS };
   try {
-    const raw = localStorage.getItem(DOCCT_SETTINGS_KEY) ?? localStorage.getItem(LEGACY_SETTINGS_KEY);
+    const raw = readDocctValue(DOCCT_SETTINGS_KEY, LEGACY_DOCCT_SETTINGS_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw);
-      // Type coercion matching original
-      return {
-        timer: Number(parsed.timer) || DEFAULT_SETTINGS.timer,
-        useVoice: !!parsed.useVoice,
-        useKeypad: !!parsed.useKeypad,
-        keypadLayout: parsed.keypadLayout === 'sequential' ? 'sequential' : 'classic',
-        displayMode: parsed.displayMode === 'focus' ? 'focus' : 'standard',
-        voicePack: ['rose', 'rose_fast', 'jenny'].includes(parsed.voicePack) ? String(parsed.voicePack) : DEFAULT_SETTINGS.voicePack,
-        wrongSound: ['none', 'beep', 'fart'].includes(parsed.wrongSound) ? parsed.wrongSound : DEFAULT_SETTINGS.wrongSound,
-        startingInterval: Number(parsed.startingInterval) || DEFAULT_SETTINGS.startingInterval,
-        minimumInterval: Number(parsed.minimumInterval) || DEFAULT_SETTINGS.minimumInterval,
-        intervalMode: parsed.intervalMode === 'fixed' ? 'fixed' : 'adaptive',
-        adaptationMode: parsed.adaptationMode === 'classic' ? 'classic' : 'responsive',
-        adaptationStepMs: Number(parsed.adaptationStepMs) > 0 ? Math.max(50, Math.min(500, Number(parsed.adaptationStepMs))) : DEFAULT_SETTINGS.adaptationStepMs,
-        onboardingCompleted: !!parsed.onboardingCompleted,
-        taskMode: ['1-back', '2-back', 'variable'].includes(parsed.taskMode) ? parsed.taskMode : DEFAULT_SETTINGS.taskMode,
-      };
+      return normalizeGameSettings(JSON.parse(raw));
     }
   } catch { /* ignore */ }
   return { ...DEFAULT_SETTINGS };
@@ -153,7 +209,7 @@ function loadSettingsFromStorage(): GameSettings {
 
 function saveSettingsToStorage(settings: GameSettings): void {
   if (typeof localStorage === 'undefined') return;
-  try { localStorage.setItem(DOCCT_SETTINGS_KEY, JSON.stringify(settings)); } catch { /* ignore */ }
+  try { writeDocctValue(DOCCT_SETTINGS_KEY, JSON.stringify(settings)); } catch { /* ignore */ }
 }
 
 function validateSessionResult(entry: any): SessionResult | null {
@@ -188,7 +244,7 @@ function validateSessionResult(entry: any): SessionResult | null {
 function loadHistoryFromStorage(): SessionResult[] {
   if (typeof localStorage === 'undefined') return [];
   try {
-    const raw = localStorage.getItem(DOCCT_HISTORY_KEY) ?? localStorage.getItem(LEGACY_HISTORY_KEY);
+    const raw = readDocctValue(DOCCT_HISTORY_KEY, LEGACY_DOCCT_HISTORY_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return [];
@@ -201,7 +257,7 @@ function loadHistoryFromStorage(): SessionResult[] {
 function saveHistoryToStorage(history: SessionResult[]): void {
   if (typeof localStorage === 'undefined') return;
   try {
-    localStorage.setItem(DOCCT_HISTORY_KEY, JSON.stringify(history));
+    writeDocctValue(DOCCT_HISTORY_KEY, JSON.stringify(history));
   } catch (e: any) {
     // QuotaExceeded handling: drop oldest entries until write succeeds
     if (e?.name === 'QuotaExceededError') {
@@ -209,7 +265,7 @@ function saveHistoryToStorage(history: SessionResult[]): void {
       while (remaining.length > 0) {
         remaining.shift();
         try {
-          localStorage.setItem(DOCCT_HISTORY_KEY, JSON.stringify(remaining));
+          writeDocctValue(DOCCT_HISTORY_KEY, JSON.stringify(remaining));
           return;
         } catch { /* keep trying */ }
       }
@@ -226,7 +282,7 @@ interface HighScores {
 function loadHighScores(): Record<string, HighScores> {
   if (typeof localStorage === 'undefined') return {};
   try {
-    const raw = localStorage.getItem(DOCCT_HIGH_SCORES_KEY) ?? localStorage.getItem(LEGACY_HIGH_SCORES_KEY);
+    const raw = readDocctValue(DOCCT_HIGH_SCORES_KEY, LEGACY_DOCCT_HIGH_SCORES_KEY);
     if (raw) return JSON.parse(raw);
   } catch { /* ignore */ }
   return {};
@@ -234,7 +290,7 @@ function loadHighScores(): Record<string, HighScores> {
 
 function saveHighScores(scores: Record<string, HighScores>): void {
   if (typeof localStorage === 'undefined') return;
-  try { localStorage.setItem(DOCCT_HIGH_SCORES_KEY, JSON.stringify(scores)); } catch { /* ignore */ }
+  try { writeDocctValue(DOCCT_HIGH_SCORES_KEY, JSON.stringify(scores)); } catch { /* ignore */ }
 }
 
 function getBestForMode(mode: string): HighScores {
@@ -275,7 +331,10 @@ export function createEngine(
   const subscribers: Array<(state: GameState) => void> = [];
 
   // Merge persisted settings with defaults, then apply any overrides
-  const settings: GameSettings = { ...loadSettingsFromStorage(), ...overrides };
+  const storedSettings = loadSettingsFromStorage();
+  const settings: GameSettings = normalizeGameSettings({ ...storedSettings, ...overrides }, storedSettings);
+  let sessionSettings: Readonly<GameSettings> | null = null;
+  const activeSettings = (): Readonly<GameSettings> => sessionSettings ?? settings;
 
   // ── Internal mutable state ─────────────────────────────────────────────
   // These are the engine's private fields. They are NOT exposed directly —
@@ -450,7 +509,7 @@ export function createEngine(
   }
 
   function playWrongSound(): void {
-    if (settings.wrongSound === 'fart') {
+    if (activeSettings().wrongSound === 'fart') {
       playFartSound();
     } else {
       playBeepSound();
@@ -499,7 +558,7 @@ export function createEngine(
       sessionResults,
       history: loadHistoryFromStorage(),
       settings: { ...settings },
-      voicePackPath: assetUrl(settings.voicePack),
+      voicePackPath: assetUrl(activeSettings().voicePack),
     };
   }
 
@@ -511,8 +570,9 @@ export function createEngine(
   // ── N-Back determination ───────────────────────────────────────────────
 
   function determineNBack(): number {
-    if (settings.taskMode === 'variable') return Math.random() < 0.5 ? 1 : 2;
-    return settings.taskMode === '2-back' ? 2 : 1;
+    const config = activeSettings();
+    if (config.taskMode === 'variable') return Math.random() < 0.5 ? 1 : 2;
+    return config.taskMode === '2-back' ? 2 : 1;
   }
 
   // ── Streak reset check ─────────────────────────────────────────────────
@@ -540,7 +600,7 @@ export function createEngine(
     if (pendingAnswer === undefined) {
       lastAnswerCorrect = false;
       recordIncorrect();
-      if (settings.wrongSound !== 'none') playWrongSound();
+      if (activeSettings().wrongSound !== 'none') playWrongSound();
       return;
     }
 
@@ -554,7 +614,7 @@ export function createEngine(
     // Wrong answer
     lastAnswerCorrect = false;
     recordIncorrect();
-    if (settings.wrongSound !== 'none') playWrongSound();
+    if (activeSettings().wrongSound !== 'none') playWrongSound();
   }
 
   // ── Score recording ────────────────────────────────────────────────────
@@ -562,6 +622,7 @@ export function createEngine(
   // threshold, adapt the interval (speed up or slow down).
 
   function recordCorrect(): void {
+    const config = activeSettings();
     totalCorrect++;                    // lifetime correct count
     correctStreakCounter++;            // count toward next speed-up
     wrongStreakCounter = 0;            // break any wrong streak
@@ -570,10 +631,10 @@ export function createEngine(
 
     if (correctStreakCounter === STREAK_THRESHOLD) {
       longestStreakCount++;            // count completed streaks for high score
-      if (settings.intervalMode === 'adaptive') {
+      if (config.intervalMode === 'adaptive') {
         // Player hit the streak target — speed up!
-        const step = adaptationStep(currentInterval, settings.adaptationMode, settings.adaptationStepMs);
-        currentInterval = Math.max(settings.minimumInterval, currentInterval - step);
+        const step = adaptationStep(currentInterval, config.adaptationMode, config.adaptationStepMs);
+        currentInterval = Math.max(config.minimumInterval, currentInterval - step);
         fastestInterval = Math.min(fastestInterval, currentInterval);
       }
       correctStreakCounter = 0;        // reset for next streak cycle
@@ -581,6 +642,7 @@ export function createEngine(
   }
 
   function recordIncorrect(): void {
+    const config = activeSettings();
     totalWrong++;                      // lifetime wrong count
     wrongStreakCounter++;              // count toward next slow-down
     correctStreakCounter = 0;          // break any correct streak
@@ -588,13 +650,13 @@ export function createEngine(
     wrongStreak = Math.min(wrongStreakCounter, STREAK_THRESHOLD); // update display (capped)
 
     if (wrongStreakCounter === STREAK_THRESHOLD) {
-      if (settings.intervalMode === 'adaptive') {
+      if (config.intervalMode === 'adaptive') {
         // Player hit the wrong-streak target — slow down!
-        const nextInterval = currentInterval + adaptationStep(currentInterval, settings.adaptationMode, settings.adaptationStepMs);
+        const nextInterval = currentInterval + adaptationStep(currentInterval, config.adaptationMode, config.adaptationStepMs);
         // Preserve Responsive's existing unbounded slow-down. Classic stays
         // within the user's configured starting/minimum range.
-        currentInterval = settings.adaptationMode === 'classic'
-          ? Math.min(settings.startingInterval, nextInterval)
+        currentInterval = config.adaptationMode === 'classic'
+          ? Math.min(config.startingInterval, nextInterval)
           : nextInterval;
       }
       wrongStreakCounter = 0;          // reset for next streak cycle
@@ -655,7 +717,7 @@ export function createEngine(
       // ── Phase 4: Play audio (if voice mode) ──────────────────────────
       let audioDurationMs = 0;
       audioPlayingId++; // bump monotonic ID so stale audio callbacks are ignored
-      if (settings.useVoice) {
+      if (activeSettings().useVoice) {
         audioDurationMs = playDigitSound(digit); // returns duration in ms
         isPlayingAudio = true;
         notify(); // push state so UI shows playing indicator
@@ -664,14 +726,14 @@ export function createEngine(
         // The monotonic audioPlayingId ensures only the latest audio's
         // callbacks fire — stale callbacks from previous digits are no-ops.
         const currentId = audioPlayingId;
-        const safetyTimeout = setTimeout(() => {
+        setTimeout(() => {
           if (audioPlayingId === currentId && isPlayingAudio) {
             isPlayingAudio = false;
             notify();
           }
         }, audioDurationMs + 200); // +200ms buffer for decode latency
 
-        const ctx = getAudioContext();
+        getAudioContext();
         clearTimeout(digitTimer as any); // clear any stale timer
         setTimeout(() => {
           if (audioPlayingId === currentId) {
@@ -712,59 +774,64 @@ export function createEngine(
   // ── Session completion ─────────────────────────────────────────────────
 
   function stopSession(): void {
+    if (phase !== 'active' && phase !== 'paused') return;
+    phase = 'ending';
     stopTimers();
+    audioPlayingId++;
+    const config = activeSettings();
 
-    // Check any pending answer before completing
-    checkStreakReset();
-    checkPendingAnswer();
-    pendingAnswer = undefined;
+    try {
+      // Check any pending answer before completing.
+      checkStreakReset();
+      checkPendingAnswer();
+      pendingAnswer = undefined;
 
-    const durationSec = totalTime - timeLeft;
-    const totalTrials = totalCorrect + totalWrong;
-    const accuracy = totalTrials > 0 ? totalCorrect / totalTrials : 0;
-    const averageResponseMs = responseCount > 0 ? totalResponseMs / responseCount : 0;
+      const durationSec = totalTime - timeLeft;
+      const totalTrials = totalCorrect + totalWrong;
+      const accuracy = totalTrials > 0 ? totalCorrect / totalTrials : 0;
+      const averageResponseMs = responseCount > 0 ? totalResponseMs / responseCount : 0;
 
-    sessionResults = {
-      sessionId: createSessionId(),
-      completedAt: new Date().toISOString(),
-      mode: settings.taskMode,
-      intervalMode: settings.intervalMode,
-      adaptationMode: settings.adaptationMode,
-      adaptationStepMs: settings.adaptationStepMs,
-      durationSec,
-      accuracy,
-      fastestIntervalMs: fastestInterval,
-      endingIntervalMs: currentInterval,
-      averageResponseTimeMs: averageResponseMs,
-      correctCount: totalCorrect,
-      totalAnswers: totalTrials,
-      streaks: longestStreakCount,
-      useVoice: settings.useVoice,
-      useKeypad: settings.useKeypad,
-    };
+      sessionResults = {
+        sessionId: createSessionId(),
+        completedAt: new Date().toISOString(),
+        mode: config.taskMode,
+        intervalMode: config.intervalMode,
+        adaptationMode: config.adaptationMode,
+        adaptationStepMs: config.adaptationStepMs,
+        durationSec,
+        accuracy,
+        fastestIntervalMs: fastestInterval,
+        endingIntervalMs: currentInterval,
+        averageResponseTimeMs: averageResponseMs,
+        correctCount: totalCorrect,
+        totalAnswers: totalTrials,
+        streaks: longestStreakCount,
+        useVoice: config.useVoice,
+        useKeypad: config.useKeypad,
+      };
 
-    // Save to history
-    const history = loadHistoryFromStorage();
-    history.push(sessionResults);
-    saveHistoryToStorage(history);
-    onSessionComplete?.({ ...sessionResults });
+      const history = loadHistoryFromStorage();
+      history.push(sessionResults);
+      saveHistoryToStorage(history);
+      onSessionComplete?.({ ...sessionResults });
 
-    // Keep fixed-pacing records separate from adaptive records. In fixed mode,
-    // the interval is chosen rather than earned through adaptation.
-    const highScoreMode = settings.intervalMode === 'fixed'
-      ? `${settings.taskMode}:fixed`
-      : settings.taskMode;
-    updateBestScores(highScoreMode, {
-      fastest: fastestInterval,
-      streaks: longestStreakCount,
-      correctRatio: accuracy,
-    });
-
-    phase = 'complete';
-    currentDigit = null;
-    canAnswer = false;
-    isPlayingAudio = false;
-    notify();
+      // Keep fixed-pacing records separate from adaptive records. In fixed mode,
+      // the interval is chosen rather than earned through adaptation.
+      const highScoreMode = config.intervalMode === 'fixed'
+        ? `${config.taskMode}:fixed`
+        : config.taskMode;
+      updateBestScores(highScoreMode, {
+        fastest: fastestInterval,
+        streaks: longestStreakCount,
+        correctRatio: accuracy,
+      });
+    } finally {
+      phase = 'complete';
+      currentDigit = null;
+      canAnswer = false;
+      isPlayingAudio = false;
+      notify();
+    }
   }
 
   // ── Public API ─────────────────────────────────────────────────────────
@@ -782,11 +849,14 @@ export function createEngine(
     },
 
     start() {
+      if (phase !== 'setup') return;
+      sessionSettings = Object.freeze({ ...settings });
+      const config = activeSettings();
       // Reset session state from the latest setup values
-      timeLeft = settings.timer;
-      totalTime = settings.timer;
-      currentInterval = settings.startingInterval;
-      fastestInterval = settings.startingInterval;
+      timeLeft = config.timer;
+      totalTime = config.timer;
+      currentInterval = config.startingInterval;
+      fastestInterval = config.startingInterval;
       correctStreak = 0;
       wrongStreak = 0;
       correctStreakCounter = 0;
@@ -814,14 +884,17 @@ export function createEngine(
 
       // Preload voice pack and beep, then start with initial delay
       Promise.all([
-        preloadVoicePack(settings.voicePack),
+        preloadVoicePack(config.voicePack),
         preloadBeep(),
         preloadFarts(),
       ]).then(() => {
         if (phase === 'active') {
           // Set navigator.audioSession for mobile
-          if (typeof navigator !== 'undefined' && navigator.audioSession) {
-            navigator.audioSession.type = 'playback';
+          const audioNavigator = typeof navigator === 'undefined'
+            ? undefined
+            : navigator as Navigator & { audioSession?: { type: string } };
+          if (audioNavigator?.audioSession) {
+            audioNavigator.audioSession.type = 'playback';
           }
           // Original starts first digit after 500ms (hardcoded initial delay)
           scheduleNextDigit(INITIAL_DELAY);
@@ -865,6 +938,7 @@ export function createEngine(
 
     restart() {
       if (phase !== 'complete') return;
+      sessionSettings = null;
       phase = 'setup';
       timeLeft = settings.timer;
       totalTime = settings.timer;
@@ -889,24 +963,28 @@ export function createEngine(
     },
 
     completeOnboarding() {
+      if (phase !== 'onboarding') return;
       settings.onboardingCompleted = true;
       saveSettingsToStorage(settings);
       phase = 'setup';
       notify();
     },
     showOnboarding() {
+      if (phase !== 'setup' && phase !== 'complete') return;
       phase = 'onboarding';
       notify();
     },
 
     updateSettings(s) {
-      Object.assign(settings, s);
+      if (phase === 'active' || phase === 'paused' || phase === 'ending') return false;
+      Object.assign(settings, normalizeGameSettings({ ...settings, ...s }, settings));
       if (s.timer !== undefined && (phase === 'setup' || phase === 'onboarding')) {
         timeLeft = settings.timer;
         totalTime = settings.timer;
       }
       saveSettingsToStorage(settings);
       notify();
+      return true;
     },
 
     loadHistory() {
@@ -915,6 +993,7 @@ export function createEngine(
 
     dispose() {
       stopTimers();
+      audioPlayingId++;
       subscribers.length = 0;
       if (audioContext) {
         audioContext.close();

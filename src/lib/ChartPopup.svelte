@@ -2,13 +2,13 @@
   import { analytics } from '../stores/analyticsStore'
   import { mobile } from '../stores/mobileStore'
   import { recentGamesState } from '../stores/recentGamesStore'
-  import ProgressChart from './ProgressChart.svelte'
   import { ChartColumn } from '@lucide/svelte'
   import RecentGames from './RecentGames.svelte'
   import TimeStats from './TimeStats.svelte'
 
   let show = false
   let tab = 'recent-games'
+  let progressChartPromise
   const openModal = async () => {
     show = true
   }
@@ -21,31 +21,38 @@
     if (event.key === "Escape") closeModal()
   }
 
-  const handleBackdropClick = (event) => {
-    if (event.target.classList.contains('modal')) closeModal()
+  const selectTab = (nextTab) => {
+    tab = nextTab
+    if (nextTab === 'progress-chart' && !progressChartPromise) {
+      progressChartPromise = import('./ProgressChart.svelte')
+    }
   }
 
 </script>
 
+<svelte:window on:keydown={handleKeydown} />
 <button class="flex items-center justify-center" on:click={openModal}>
   <ChartColumn class="btn btn-square btn-ghost h-8 lg:h-6" />
 </button>
 {#if show}
-  <div class="modal modal-open" on:click={handleBackdropClick} on:keydown={handleKeydown} tabindex="0">
-    <div class="modal-box w-[90%] max-w-[1500px]">
+  <div class="modal modal-open" role="dialog" aria-modal="true" aria-label="Training history">
+    <button type="button" class="fixed inset-0 cursor-default" aria-label="Close training history" on:click={closeModal}></button>
+    <div class="modal-box relative w-[90%] max-w-[1500px]">
       <div role="tablist" class="tabs tabs-lift relative">
-        <a role="tab" 
+        <button type="button" role="tab"
+          aria-selected={tab === 'recent-games'}
           class="tab" 
           class:tab-active={tab === 'recent-games'} 
-          on:click={() => tab = 'recent-games'}>
+          on:click={() => selectTab('recent-games')}>
           Recent Games
-        </a>
-        <a role="tab" 
+        </button>
+        <button type="button" role="tab"
+          aria-selected={tab === 'progress-chart'}
           class="tab"
           class:tab-active={tab === 'progress-chart'}
-          on:click={() => tab = 'progress-chart'}>
+          on:click={() => selectTab('progress-chart')}>
           Progress Chart
-        </a>
+        </button>
       </div>
       <div class="w-full h-[65svh] overflow-y-auto">
         {#if tab === 'recent-games'}
@@ -53,7 +60,11 @@
         {:else}
         <TimeStats />
         <div class="h-[50svh]">
-          <ProgressChart />
+          {#await progressChartPromise}
+            <div class="flex h-full items-center justify-center"><span class="loading loading-spinner"></span></div>
+          {:then module}
+            <svelte:component this={module.default} />
+          {/await}
         </div>
         {/if}
       </div>

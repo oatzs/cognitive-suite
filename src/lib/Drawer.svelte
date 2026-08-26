@@ -71,13 +71,13 @@ onMount(() => {
   class:grid-cols-[3fr_2fr_3fr]={!$mobile}
   >
     <div class="flex gap-2">
-      <div on:click|stopPropagation={toggle} bind:this={panelButtonRef}>
+      <button type="button" on:click|stopPropagation={toggle} bind:this={panelButtonRef} aria-label={open ? 'Close settings' : 'Open settings'}>
         {#if open}
           <PanelLeftClose class="btn btn-square btn-ghost h-8 lg:h-6" />
         {:else}
           <PanelLeftOpen class="btn btn-square btn-ghost h-8 lg:h-6" />
         {/if}
-      </div>
+      </button>
     </div>
     <div class="justify-self-center flex gap-4 select-none px-6 whitespace-nowrap max-w-[70svw] overflow-hidden"
       class:advance={$autoProgression.advance}
@@ -135,16 +135,17 @@ onMount(() => {
           </select>
         </div>
         {#if $settings.mode !== 'vtally' && $settings.mode !== 'atally'}
-        <div class="flex flex-col gap-1">
+        <fieldset disabled={$isPlaying} class="flex flex-col gap-1" class:opacity-60={$isPlaying}>
           <div class="grid grid-cols-[3fr_1fr] items-center">
             <label for="rotation-speed-range" class="text-base">Rotation speed:</label>
             <input type="number" min="0" max="999" bind:value={$settings.rotationSpeed} step="1" class="input" />
           </div>
           <input id="rotation-speed-range" type="range" min="0" max="140" bind:value={$settings.rotationSpeed} step="1" class="range" />
-        </div>
+        </fieldset>
         {/if}
         <div class="divider"></div>
         {#if $settings.mode !== 'tally' && $settings.mode !== 'vtally' && $settings.mode !== 'atally'}
+        <fieldset disabled={$isPlaying} class:opacity-60={$isPlaying}>
         <div class="grid grid-cols-[8fr_2fr] items-center">
           <label for="enable-auto-progression" class="text-base">Auto progression:</label>
           <input id="enable-auto-progression" type="checkbox" bind:checked={$settings.enableAutoProgression} class="toggle" />
@@ -169,9 +170,10 @@ onMount(() => {
             <input disabled={!$settings.enableAutoProgression} type="range" min="1" max="9" bind:value={$settings.failureComboRequired} step="1" class="range" />
           </label>
         </div>
+        </fieldset>
         {/if}
         <div class="my-1"></div>
-        <KeybindingsPopup />
+        <KeybindingsPopup disabled={$isPlaying} />
       </div>
       <div class="my-10"></div>
     </nav>

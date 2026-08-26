@@ -9,8 +9,8 @@ const takeUntil = (array, condition) => {
   return array.slice(0, i === -1 ? array.length : i)
 }
 
-export const runAutoProgression = async (gameInfo) => {
-  const $settings = get(settings)
+export const runAutoProgression = async (gameInfo, sessionSettings = get(settings)) => {
+  const $settings = sessionSettings
   if (!$settings.enableAutoProgression) {
     return
   }

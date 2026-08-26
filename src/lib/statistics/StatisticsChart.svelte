@@ -109,11 +109,11 @@
   })
 
   $: if (mounted) {
-    points
-    metric
-    metricLabel
-    unit
-    theme
+    void points
+    void metric
+    void metricLabel
+    void unit
+    void theme
     render()
   }
 
