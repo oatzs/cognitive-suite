@@ -13,7 +13,6 @@
   import { MAX_BACKUP_CHARACTERS } from '../sessionBackup'
   import {
     METRICS,
-    chooseInitialProgressMode,
     filterSessions,
     formatMetric,
     getModalityRollups,
@@ -21,6 +20,7 @@
     groupDaily,
     metricValue,
     normalizeGames,
+    resolveProgressMode,
     sessionsToCsv,
     summarizeSessions,
   } from './stats'
@@ -33,7 +33,7 @@
   let range = 'all'
   let metric = 'adjusted'
   let progressMode = null
-  let progressModeInitialized = false
+  let progressModeManuallySelected = false
   let progressMetricSource = 'quad-box'
   let importInput
   let importing = false
@@ -62,12 +62,13 @@
     .sort((a, b) => a[1].localeCompare(b[1]))
   $: if (mode !== 'all' && !modeOptions.some(([key]) => key === mode)) mode = 'all'
   $: progressModeOptions = getProgressModeOptions(sourceSessions, source)
-  $: if (!loading && (
-    !progressModeInitialized ||
-    !progressModeOptions.some((option) => option.key === progressMode)
-  )) {
-    progressMode = chooseInitialProgressMode(progressModeOptions, sourceSessions)
-    progressModeInitialized = true
+  $: if (!loading) {
+    progressMode = resolveProgressMode(
+      progressModeOptions,
+      sourceSessions,
+      progressMode,
+      progressModeManuallySelected,
+    )
   }
   $: selectedProgressMode = progressModeOptions.find((option) => option.key === progressMode)
   $: progressSource = selectedProgressMode?.source ?? 'quad-box'
@@ -94,20 +95,20 @@
   function changeSource(nextSource) {
     source = nextSource
     mode = 'all'
-    progressModeInitialized = false
+    progressModeManuallySelected = false
   }
 
   function changeMode(nextMode) {
     mode = nextMode
     if (nextMode !== 'all' && progressModeOptions.some((option) => option.key === nextMode)) {
       progressMode = nextMode
-      progressModeInitialized = true
+      progressModeManuallySelected = true
     }
   }
 
   function changeProgressMode(nextMode) {
     progressMode = nextMode
-    progressModeInitialized = true
+    progressModeManuallySelected = true
   }
 
   function download(filename, content, type) {

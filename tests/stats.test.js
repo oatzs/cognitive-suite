@@ -8,6 +8,7 @@ import {
   groupDaily,
   metricValue,
   normalizeGame,
+  resolveProgressMode,
   sessionsToCsv,
   summarizeSessions,
 } from '../src/lib/statistics/stats.js'
@@ -102,6 +103,18 @@ describe('statistics aggregation', () => {
     const options = getProgressModeOptions(sessions, 'all')
 
     expect(chooseInitialProgressMode(options, sessions)).toBe('quad-box:quad')
+  })
+
+  it('moves an automatic empty selection to newly imported data', () => {
+    const sessions = [
+      session({ modeKey: 'quad-box:quad', modeLabel: 'Quad', variant: 'quad' }),
+    ]
+    const options = getProgressModeOptions(sessions, 'all')
+
+    expect(resolveProgressMode(options, sessions, 'quad-box:dual', false))
+      .toBe('quad-box:quad')
+    expect(resolveProgressMode(options, sessions, 'quad-box:dual', true))
+      .toBe('quad-box:dual')
   })
 
   it('groups daily average and best values', () => {

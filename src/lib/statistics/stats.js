@@ -104,6 +104,13 @@ export function chooseInitialProgressMode(options, sessions) {
     ?? null
 }
 
+export function resolveProgressMode(options, sessions, currentMode, manuallySelected) {
+  const valid = options.some((option) => option.key === currentMode)
+  const hasData = sessions.some((session) => session.modeKey === currentMode)
+  if (valid && (manuallySelected || hasData)) return currentMode
+  return chooseInitialProgressMode(options, sessions)
+}
+
 export function metricValue(session, metric, thresholds = DEFAULT_THRESHOLDS) {
   const accuracy = session.accuracy
   const n = session.nLevel
