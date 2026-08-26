@@ -1,19 +1,19 @@
 {
-  "name": "Quad Box",
-  "short_name": "Quad Box",
+  "name": "Quad Box Cognitive Suite",
+  "short_name": "Cognitive Suite",
   "icons": [
     {
-      "src": "icons/192.png",
+      "src": "assets/icons/192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "icons/512.png",
+      "src": "assets/icons/512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
   ],
-  "start_url": "/quad-box/",
+  "start_url": "./",
   "display": "fullscreen",
   "background_color": "#262626",
   "theme_color": "#121212"
