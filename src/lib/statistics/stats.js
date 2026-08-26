@@ -81,33 +81,27 @@ const primaryProgressModes = [
 ]
 
 export function getProgressModeOptions(sessions, source = 'all') {
-  const options = new Map()
-  if (source === 'all' || source === 'quad-box') {
-    for (const option of primaryProgressModes) options.set(option.key, option)
-  }
+  if (source !== 'docct') return primaryProgressModes.map((option) => ({ ...option }))
 
+  const options = new Map()
   for (const session of sessions) {
-    if (source !== 'all' && session.source !== source) continue
+    if (session.source !== 'docct') continue
     if (options.has(session.modeKey)) continue
     options.set(session.modeKey, {
       key: session.modeKey,
-      label: session.source === 'quad-box' && !session.modeLabel.toLowerCase().includes('tally')
-        ? `${session.modeLabel} N-back`
-        : session.modeLabel,
+      label: session.modeLabel,
       source: session.source,
     })
   }
 
-  return [...options.values()].sort((a, b) => {
-    const aPrimary = primaryProgressModes.findIndex((option) => option.key === a.key)
-    const bPrimary = primaryProgressModes.findIndex((option) => option.key === b.key)
-    if (aPrimary !== -1 || bPrimary !== -1) {
-      if (aPrimary === -1) return 1
-      if (bPrimary === -1) return -1
-      return aPrimary - bPrimary
-    }
-    return a.label.localeCompare(b.label)
-  })
+  return [...options.values()].sort((a, b) => a.label.localeCompare(b.label))
+}
+
+export function chooseInitialProgressMode(options, sessions) {
+  const modesWithData = new Set(sessions.map((session) => session.modeKey))
+  return options.find((option) => modesWithData.has(option.key))?.key
+    ?? options[0]?.key
+    ?? null
 }
 
 export function metricValue(session, metric, thresholds = DEFAULT_THRESHOLDS) {

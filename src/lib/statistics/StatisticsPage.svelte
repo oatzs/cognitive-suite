@@ -13,6 +13,7 @@
   import { MAX_BACKUP_CHARACTERS } from '../sessionBackup'
   import {
     METRICS,
+    chooseInitialProgressMode,
     filterSessions,
     formatMetric,
     getModalityRollups,
@@ -31,7 +32,8 @@
   let mode = 'all'
   let range = 'all'
   let metric = 'adjusted'
-  let progressMode = 'quad-box:dual'
+  let progressMode = null
+  let progressModeInitialized = false
   let progressMetricSource = 'quad-box'
   let importInput
   let importing = false
@@ -60,8 +62,12 @@
     .sort((a, b) => a[1].localeCompare(b[1]))
   $: if (mode !== 'all' && !modeOptions.some(([key]) => key === mode)) mode = 'all'
   $: progressModeOptions = getProgressModeOptions(sourceSessions, source)
-  $: if (!progressModeOptions.some((option) => option.key === progressMode)) {
-    progressMode = progressModeOptions[0]?.key ?? null
+  $: if (!loading && (
+    !progressModeInitialized ||
+    !progressModeOptions.some((option) => option.key === progressMode)
+  )) {
+    progressMode = chooseInitialProgressMode(progressModeOptions, sourceSessions)
+    progressModeInitialized = true
   }
   $: selectedProgressMode = progressModeOptions.find((option) => option.key === progressMode)
   $: progressSource = selectedProgressMode?.source ?? 'quad-box'
@@ -80,7 +86,7 @@
   $: rollups = getModalityRollups(filtered)
   $: recent = filtered.slice(0, 20)
   $: metricConfig = METRICS[metric]
-  $: metricValues = progressSessions.map((session) => metricValue(session, metric, thresholds)).filter(Number.isFinite)
+  $: metricValues = filtered.map((session) => metricValue(session, metric, thresholds)).filter(Number.isFinite)
   $: bestMetric = metricValues.length
     ? (metricConfig.lowerIsBetter ? Math.min(...metricValues) : Math.max(...metricValues))
     : null
@@ -88,13 +94,20 @@
   function changeSource(nextSource) {
     source = nextSource
     mode = 'all'
+    progressModeInitialized = false
   }
 
   function changeMode(nextMode) {
     mode = nextMode
     if (nextMode !== 'all' && progressModeOptions.some((option) => option.key === nextMode)) {
       progressMode = nextMode
+      progressModeInitialized = true
     }
+  }
+
+  function changeProgressMode(nextMode) {
+    progressMode = nextMode
+    progressModeInitialized = true
   }
 
   function download(filename, content, type) {
@@ -299,7 +312,7 @@
                   class:text-success-content={progressMode === option.key}
                   class:hover:bg-base-300={progressMode !== option.key}
                   aria-pressed={progressMode === option.key}
-                  on:click={() => progressMode = option.key}
+                  on:click={() => changeProgressMode(option.key)}
                 >{option.label}</button>
               {/each}
             </div>

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  chooseInitialProgressMode,
   filterSessions,
   getProgressModeOptions,
   getModalityRollups,
@@ -92,6 +93,15 @@ describe('statistics aggregation', () => {
       { key: 'quad-box:dual', label: 'Dual N-back', source: 'quad-box' },
       { key: 'quad-box:quad', label: 'Quad N-back', source: 'quad-box' },
     ])
+  })
+
+  it('initially selects Quad when only Quad has progress data', () => {
+    const sessions = [
+      session({ modeKey: 'quad-box:quad', modeLabel: 'Quad', variant: 'quad' }),
+    ]
+    const options = getProgressModeOptions(sessions, 'all')
+
+    expect(chooseInitialProgressMode(options, sessions)).toBe('quad-box:quad')
   })
 
   it('groups daily average and best values', () => {
