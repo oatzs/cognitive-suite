@@ -75,6 +75,41 @@ export const normalizeGames = (games) => games
   .map(normalizeGame)
   .sort((a, b) => b.timestamp - a.timestamp)
 
+const primaryProgressModes = [
+  { key: 'quad-box:dual', label: 'Dual N-back', source: 'quad-box' },
+  { key: 'quad-box:quad', label: 'Quad N-back', source: 'quad-box' },
+]
+
+export function getProgressModeOptions(sessions, source = 'all') {
+  const options = new Map()
+  if (source === 'all' || source === 'quad-box') {
+    for (const option of primaryProgressModes) options.set(option.key, option)
+  }
+
+  for (const session of sessions) {
+    if (source !== 'all' && session.source !== source) continue
+    if (options.has(session.modeKey)) continue
+    options.set(session.modeKey, {
+      key: session.modeKey,
+      label: session.source === 'quad-box' && !session.modeLabel.toLowerCase().includes('tally')
+        ? `${session.modeLabel} N-back`
+        : session.modeLabel,
+      source: session.source,
+    })
+  }
+
+  return [...options.values()].sort((a, b) => {
+    const aPrimary = primaryProgressModes.findIndex((option) => option.key === a.key)
+    const bPrimary = primaryProgressModes.findIndex((option) => option.key === b.key)
+    if (aPrimary !== -1 || bPrimary !== -1) {
+      if (aPrimary === -1) return 1
+      if (bPrimary === -1) return -1
+      return aPrimary - bPrimary
+    }
+    return a.label.localeCompare(b.label)
+  })
+}
+
 export function metricValue(session, metric, thresholds = DEFAULT_THRESHOLDS) {
   const accuracy = session.accuracy
   const n = session.nLevel

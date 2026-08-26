@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   filterSessions,
+  getProgressModeOptions,
   getModalityRollups,
   getStreaks,
   groupDaily,
@@ -81,6 +82,18 @@ describe('session normalization and game days', () => {
 })
 
 describe('statistics aggregation', () => {
+  it('keeps Dual and Quad N-back as separate progress modes', () => {
+    const options = getProgressModeOptions([
+      session({ modeKey: 'quad-box:dual', modeLabel: 'Dual', variant: 'dual' }),
+      session({ modeKey: 'quad-box:quad', modeLabel: 'Quad', variant: 'quad' }),
+    ], 'all')
+
+    expect(options.slice(0, 2)).toEqual([
+      { key: 'quad-box:dual', label: 'Dual N-back', source: 'quad-box' },
+      { key: 'quad-box:quad', label: 'Quad N-back', source: 'quad-box' },
+    ])
+  })
+
   it('groups daily average and best values', () => {
     const points = groupDaily([
       session({ accuracy: 0.5 }),

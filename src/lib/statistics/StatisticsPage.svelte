@@ -16,6 +16,7 @@
     filterSessions,
     formatMetric,
     getModalityRollups,
+    getProgressModeOptions,
     groupDaily,
     metricValue,
     normalizeGames,
@@ -29,7 +30,9 @@
   let source = 'all'
   let mode = 'all'
   let range = 'all'
-  let metric = 'accuracy'
+  let metric = 'adjusted'
+  let progressMode = 'quad-box:dual'
+  let progressMetricSource = 'quad-box'
   let importInput
   let importing = false
   let transferNotice = null
@@ -56,17 +59,28 @@
   $: modeOptions = [...new Map(sourceSessions.map((session) => [session.modeKey, session.modeLabel])).entries()]
     .sort((a, b) => a[1].localeCompare(b[1]))
   $: if (mode !== 'all' && !modeOptions.some(([key]) => key === mode)) mode = 'all'
-  $: metricOptions = source === 'all' ? ['accuracy'] : source === 'docct' ? docctMetrics : brainWorkshopMetrics
+  $: progressModeOptions = getProgressModeOptions(sourceSessions, source)
+  $: if (!progressModeOptions.some((option) => option.key === progressMode)) {
+    progressMode = progressModeOptions[0]?.key ?? null
+  }
+  $: selectedProgressMode = progressModeOptions.find((option) => option.key === progressMode)
+  $: progressSource = selectedProgressMode?.source ?? 'quad-box'
+  $: if (progressSource !== progressMetricSource) {
+    progressMetricSource = progressSource
+    metric = progressSource === 'quad-box' ? 'adjusted' : 'accuracy'
+  }
+  $: metricOptions = progressSource === 'docct' ? docctMetrics : brainWorkshopMetrics
   $: if (!metricOptions.includes(metric)) metric = metricOptions[0]
   $: thresholds = { advance: Number($settings.successCriteria) || 80, fallback: Number($settings.failureCriteria) || 50 }
   $: filtered = filterSessions(sessions, { source, mode, range })
+  $: progressSessions = filterSessions(sessions, { mode: progressMode, range })
   $: activitySessions = filterSessions(sessions, { source, mode, range: 'all' })
   $: summary = summarizeSessions(filtered)
-  $: daily = groupDaily(filtered, metric, thresholds)
+  $: daily = groupDaily(progressSessions, metric, thresholds)
   $: rollups = getModalityRollups(filtered)
   $: recent = filtered.slice(0, 20)
   $: metricConfig = METRICS[metric]
-  $: metricValues = filtered.map((session) => metricValue(session, metric, thresholds)).filter(Number.isFinite)
+  $: metricValues = progressSessions.map((session) => metricValue(session, metric, thresholds)).filter(Number.isFinite)
   $: bestMetric = metricValues.length
     ? (metricConfig.lowerIsBetter ? Math.min(...metricValues) : Math.max(...metricValues))
     : null
@@ -74,7 +88,13 @@
   function changeSource(nextSource) {
     source = nextSource
     mode = 'all'
-    metric = nextSource === 'quad-box' ? 'adjusted' : 'accuracy'
+  }
+
+  function changeMode(nextMode) {
+    mode = nextMode
+    if (nextMode !== 'all' && progressModeOptions.some((option) => option.key === nextMode)) {
+      progressMode = nextMode
+    }
   }
 
   function download(filename, content, type) {
@@ -184,7 +204,7 @@
 
         <label class="stats-control">
           <span>Mode</span>
-          <select class="select select-sm min-w-32" bind:value={mode}>
+          <select class="select select-sm min-w-32" value={mode} on:change={(event) => changeMode(event.currentTarget.value)}>
             <option value="all">All modes</option>
             {#each modeOptions as [key, label]}
               <option value={key}>{label}</option>
@@ -253,19 +273,37 @@
       </section>
 
       <section class="border-b border-base-300 py-5">
-        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 class="text-sm font-semibold">Daily progress</h2>
-            <p class="mt-1 text-xs opacity-55">Daily average and best across completed sessions.</p>
+        <div class="mb-4 flex flex-col gap-4">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 class="text-sm font-semibold">Daily progress</h2>
+              <p class="mt-1 text-xs opacity-55">{selectedProgressMode?.label ?? 'Selected mode'} sessions only.</p>
+            </div>
+            <label class="stats-control">
+              <span>Measure</span>
+              <select class="select select-sm min-w-48" bind:value={metric}>
+                {#each metricOptions as key}
+                  <option value={key}>{METRICS[key].label}</option>
+                {/each}
+              </select>
+            </label>
           </div>
-          <label class="stats-control">
-            <span>Measure</span>
-            <select class="select select-sm min-w-48" bind:value={metric}>
-              {#each metricOptions as key}
-                <option value={key}>{METRICS[key].label}</option>
+          <div>
+            <span class="mb-1 block text-[0.7rem] opacity-60">Progress mode</span>
+            <div class="inline-flex max-w-full flex-wrap gap-1 rounded-md border border-base-300 bg-base-200 p-1" role="group" aria-label="Progress mode">
+              {#each progressModeOptions as option}
+                <button
+                  type="button"
+                  class="min-h-8 rounded-md px-3 py-1.5 text-sm font-medium"
+                  class:bg-success={progressMode === option.key}
+                  class:text-success-content={progressMode === option.key}
+                  class:hover:bg-base-300={progressMode !== option.key}
+                  aria-pressed={progressMode === option.key}
+                  on:click={() => progressMode = option.key}
+                >{option.label}</button>
               {/each}
-            </select>
-          </label>
+            </div>
+          </div>
         </div>
         <div class="h-[360px] min-h-64 w-full sm:h-[430px]">
           <StatisticsChart
