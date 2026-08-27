@@ -1,11 +1,25 @@
 # Cognitive Suite
-N-Back and Cognitive Control Training are mindbuilding activites that with many hours of dedicated practice can improve your executive functioning, working memory, concentration, and arguably intelligence.
 
-I put together my favorite n-back and CCT training websites into one application. The desktop app works offline and stores settings and training history locally on that device. It also has a separate statistics page like Brain Workshop's.
+Cognitive Suite puts Quad Box n-back and DocCT cognitive control training in one local-first app. The web and desktop versions keep settings and training history on your device, with no account required.
+
+## What this version adds to Quad Box
+
+This project keeps the original Quad Box trainer and adds the parts I wanted around it:
+
+- Built-in DocCT, including its 1-back, 2-back, variable, fixed-speed, and adaptive training options.
+- Simple navigation between Quad Box, DocCT, and a shared Statistics page.
+- A combined history view for both trainers, with filters for trainer, mode, and date range.
+- Separate progress charts for Dual, Quad, Custom, and DocCT modes, with Brain Workshop-style score measures, accuracy, response time, and interval speed where applicable.
+- Daily session counts alongside training time, a 12-month activity heatmap, streak tracking, best scores, recent sessions, and per-modality accuracy. Training days roll over at 4:00 AM, so late-night sessions stay together.
+- JSON backup and restore for moving completed sessions between devices. Imports merge histories and skip duplicates instead of overwriting existing data.
+- CSV export for the currently selected statistics.
+- Offline desktop builds for Windows, macOS, and Linux.
+- Safer active sessions: settings and mode switching are locked once training starts, session settings stay fixed until the run ends, and repeated stop or navigation events cannot save the same session twice.
+- A full local-data reset that clears history, high scores, and settings from both trainers together.
 
 If you want to try it out online:
 
-https://oatzs.github.io/cognitive-suite/
+[https://oatzs.github.io/cognitive-suite/](https://oatzs.github.io/cognitive-suite/)
 
 Check out the mindbuilding discord, a great resource: https://discord.gg/brain
 
