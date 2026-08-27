@@ -82,6 +82,41 @@ describe('session normalization and game days', () => {
     expect(metricValue(normalized, 'responseTime')).toBe(410)
   })
 
+  it('normalizes Syllogimous accuracy, timing, and reasoning metadata', () => {
+    const completedAt = new Date(2026, 0, 6, 12).getTime()
+    const normalized = normalizeGame({
+      source: 'syllogimous',
+      timestamp: completedAt,
+      status: 'completed',
+      variant: 'syllogism',
+      tags: ['answer'],
+      scores: { answer: { hits: 7, misses: 3, possible: 10 } },
+      elapsedSeconds: 150,
+      syllogimous: {
+        mode: 'syllogism',
+        correctCount: 7,
+        totalAnswers: 10,
+        durationSec: 150,
+        averageResponseTimeMs: 1250,
+        averagePremises: 3.4,
+      },
+    })
+
+    expect(normalized).toMatchObject({
+      source: 'syllogimous',
+      sourceLabel: 'Syllogimous',
+      modeKey: 'syllogimous:syllogism',
+      modeLabel: 'Syllogism',
+      nLevel: null,
+      accuracy: 0.7,
+      durationSec: 150,
+      hits: 7,
+      possible: 10,
+      responseTimeMs: 1250,
+      averagePremises: 3.4,
+    })
+  })
+
   it('groups generated tri configurations under Custom N-back', () => {
     const normalized = normalizeGame({
       timestamp: new Date(2026, 0, 6, 12).getTime(),
@@ -122,6 +157,51 @@ describe('statistics aggregation', () => {
 
     expect(options).toContainEqual({ key: 'quad-box:experimental', label: 'Experimental N-back', source: 'quad-box' })
     expect(options.some((option) => option.key === 'quad-box:tally-dual')).toBe(false)
+  })
+
+  it('offers only recorded Syllogimous modes as progress options', () => {
+    const options = getProgressModeOptions([
+      session({
+        source: 'syllogimous',
+        sourceLabel: 'Syllogimous',
+        modeKey: 'syllogimous:syllogism',
+        modeLabel: 'Syllogism',
+        variant: 'syllogism',
+        nLevel: null,
+      }),
+      session({
+        source: 'syllogimous',
+        sourceLabel: 'Syllogimous',
+        modeKey: 'syllogimous:mixed',
+        modeLabel: 'Mixed',
+        variant: 'mixed',
+        nLevel: null,
+      }),
+      session({ modeKey: 'quad-box:quad', modeLabel: 'Quad', variant: 'quad' }),
+    ], 'syllogimous')
+
+    expect(options).toEqual([
+      { key: 'syllogimous:mixed', label: 'Mixed', source: 'syllogimous' },
+      { key: 'syllogimous:syllogism', label: 'Syllogism', source: 'syllogimous' },
+    ])
+  })
+
+  it('uses accuracy and response-time metrics without inventing an n-back score for Syllogimous', () => {
+    const result = session({
+      source: 'syllogimous',
+      sourceLabel: 'Syllogimous',
+      modeKey: 'syllogimous:mixed',
+      modeLabel: 'Mixed',
+      nLevel: null,
+      accuracy: 0.75,
+      responseTimeMs: 1425,
+    })
+
+    expect(metricValue(result, 'accuracy')).toBe(75)
+    expect(metricValue(result, 'responseTime')).toBe(1425)
+    expect(metricValue(result, 'sessions')).toBe(1)
+    expect(metricValue(result, 'adjusted')).toBeNull()
+    expect(metricValue(result, 'n')).toBeNull()
   })
 
   it('initially selects Quad when only Quad has progress data', () => {

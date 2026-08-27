@@ -8,28 +8,38 @@ import { settings } from "./stores/settingsStore"
 import { setMobile } from "./stores/mobileStore"
 import { isPlaying } from "./stores/gameRunningStore"
 import { analytics } from "./stores/analyticsStore"
-import { addDocctSession } from "./lib/gamedb"
+import { addDocctSession, addSyllogimousSession, deleteGamesBySource } from "./lib/gamedb"
 import { error } from "./stores/errorStore"
 import { onMount, onDestroy } from "svelte"
 
 $: theme = $settings.theme === 'dark' ? 'black' : 'bumblebee'
 let view = 'quad-box'
 let docctActive = false
+let syllogimousActive = false
 let renderedQuadMode = $settings.mode
 let optionalViewPromise = null
 const optionalViews = new Map()
-$: navigationLocked = $isPlaying || docctActive
+const optionalViewLoaders = {
+  docct: () => import('./lib/docct/DocctApp.svelte'),
+  syllogimous: () => import('./lib/syllogimous/SyllogimousApp.svelte'),
+  statistics: () => import('./lib/statistics/StatisticsPage.svelte'),
+}
+$: navigationLocked = $isPlaying || docctActive || syllogimousActive
 $: if (!$isPlaying) renderedQuadMode = $settings.mode
-$: pageTitle = view === 'docct' ? 'DocCT' : view === 'statistics' ? 'Statistics' : 'Quad Box'
+$: pageTitle = view === 'docct'
+  ? 'DocCT'
+  : view === 'syllogimous'
+    ? 'Syllogimous'
+    : view === 'statistics'
+      ? 'Statistics'
+      : 'Quad Box'
 
 const navigate = (nextView) => {
   if (navigationLocked && nextView !== view) return
   view = nextView
-  if (nextView === 'docct' || nextView === 'statistics') {
+  if (optionalViewLoaders[nextView]) {
     if (!optionalViews.has(nextView)) {
-      optionalViews.set(nextView, nextView === 'docct'
-        ? import('./lib/docct/DocctApp.svelte')
-        : import('./lib/statistics/StatisticsPage.svelte'))
+      optionalViews.set(nextView, optionalViewLoaders[nextView]())
     }
     optionalViewPromise = optionalViews.get(nextView)
   }
@@ -55,6 +65,30 @@ const persistDocctSession = async (session) => {
         stacktrace: reason?.stack || reason,
       })
     }
+  }
+}
+
+const persistSyllogimousSession = async (session) => {
+  try {
+    const added = await addSyllogimousSession(session)
+    if (added) await analytics.refreshDaily()
+  } catch (reason) {
+    error.set({
+      message: reason?.message || 'Could not save the Syllogimous session',
+      stacktrace: reason?.stack || reason,
+    })
+  }
+}
+
+const resetSyllogimousStatistics = async () => {
+  try {
+    await deleteGamesBySource('syllogimous')
+    await analytics.refreshDaily()
+  } catch (reason) {
+    error.set({
+      message: reason?.message || 'Could not clear Syllogimous statistics',
+      stacktrace: reason?.stack || reason,
+    })
   }
 }
 
@@ -120,6 +154,19 @@ onDestroy(async () => {
         <svelte:component this={module.default} onActiveChange={(active) => docctActive = active} onSessionComplete={persistDocctSession} />
       {:catch reason}
         <div class="p-6 text-error">{reason?.message || 'Could not load DocCT'}</div>
+      {/await}
+    {:else if view === 'syllogimous'}
+      {#await optionalViewPromise}
+        <div class="flex h-full items-center justify-center"><span class="loading loading-spinner loading-lg"></span></div>
+      {:then module}
+        <svelte:component
+          this={module.default}
+          onActiveChange={(active) => syllogimousActive = active}
+          onSessionComplete={persistSyllogimousSession}
+          onDataReset={resetSyllogimousStatistics}
+        />
+      {:catch reason}
+        <div class="p-6 text-error">{reason?.message || 'Could not load Syllogimous'}</div>
       {/await}
     {:else}
       {#await optionalViewPromise}

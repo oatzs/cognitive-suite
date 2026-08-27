@@ -8,7 +8,7 @@
   let games = []
 
   onMount(async () => {
-    games = await getLastMonthGames()
+    games = (await getLastMonthGames()).filter(game => !game.source || game.source === 'quad-box')
   })
 
   const getStatusColor = (status) => {

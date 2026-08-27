@@ -39,8 +39,15 @@
   let importing = false
   let transferNotice = null
 
-  const brainWorkshopMetrics = ['sessions', 'adjusted', 'n', 'accuracy', 'nAccuracy', 'weightedAccuracy']
-  const docctMetrics = [...brainWorkshopMetrics, 'fastestInterval', 'responseTime']
+  const nbackMetrics = ['sessions', 'adjusted', 'n', 'accuracy', 'nAccuracy', 'weightedAccuracy']
+  const docctMetrics = [...nbackMetrics, 'fastestInterval', 'responseTime']
+  const syllogimousMetrics = ['sessions', 'accuracy', 'responseTime']
+  const metricsForSource = (trainer) => trainer === 'docct'
+    ? docctMetrics
+    : trainer === 'syllogimous'
+      ? syllogimousMetrics
+      : nbackMetrics
+  const defaultMetricForSource = (trainer) => trainer === 'quad-box' ? 'adjusted' : 'accuracy'
 
   async function load() {
     loading = true
@@ -71,12 +78,13 @@
     )
   }
   $: selectedProgressMode = progressModeOptions.find((option) => option.key === progressMode)
-  $: progressSource = selectedProgressMode?.source ?? 'quad-box'
+  $: progressSource = selectedProgressMode?.source
+    ?? (source === 'docct' || source === 'syllogimous' ? source : 'quad-box')
   $: if (progressSource !== progressMetricSource) {
     progressMetricSource = progressSource
-    if (metric !== 'sessions') metric = progressSource === 'quad-box' ? 'adjusted' : 'accuracy'
+    if (metric !== 'sessions') metric = defaultMetricForSource(progressSource)
   }
-  $: metricOptions = progressSource === 'docct' ? docctMetrics : brainWorkshopMetrics
+  $: metricOptions = metricsForSource(progressSource)
   $: if (!metricOptions.includes(metric)) metric = metricOptions[0]
   $: thresholds = { advance: Number($settings.successCriteria) || 80, fallback: Number($settings.failureCriteria) || 50 }
   $: filtered = filterSessions(sessions, { source, mode, range })
@@ -189,6 +197,15 @@
       const response = Number.isFinite(session.responseTimeMs) && session.responseTimeMs > 0 ? `${Math.round(session.responseTimeMs)}ms response` : 'No response time'
       return `${fastest} · ${response}`
     }
+    if (session.source === 'syllogimous') {
+      const response = Number.isFinite(session.responseTimeMs) && session.responseTimeMs > 0
+        ? `${Math.round(session.responseTimeMs)}ms response`
+        : 'No response time'
+      const premises = Number.isFinite(session.averagePremises)
+        ? `${session.averagePremises.toFixed(1)} avg premises`
+        : 'No premise count'
+      return `${session.hits}/${session.possible} correct · ${response} · ${premises}`
+    }
     return `${session.hits}/${session.possible} correct`
   }
 
@@ -215,6 +232,7 @@
             <option value="all">All trainers</option>
             <option value="quad-box">Quad Box</option>
             <option value="docct">DocCT</option>
+            <option value="syllogimous">Syllogimous</option>
           </select>
         </label>
 

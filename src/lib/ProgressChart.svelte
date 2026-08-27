@@ -125,7 +125,8 @@
   }
 
   onMount(async () => {
-    const games = (await getAllCompletedGames()).filter(game => 'ncalc' in game)
+    const games = (await getAllCompletedGames())
+      .filter(game => (!game.source || game.source === 'quad-box') && 'ncalc' in game)
     const datasets = getDailyAveragesByTitle(games)
 
     chart = new Chart(canvas.getContext('2d'), {

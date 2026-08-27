@@ -1,4 +1,4 @@
-export const SESSION_BACKUP_SCHEMA_VERSION = 1
+export const SESSION_BACKUP_SCHEMA_VERSION = 2
 export const MAX_BACKUP_SESSIONS = 100_000
 export const MAX_BACKUP_CHARACTERS = 25 * 1024 * 1024
 export const MIN_SESSION_TIMESTAMP = 0
@@ -17,6 +17,7 @@ export class SessionBackupError extends Error {
 
 const isPlainObject = (value) => Object.prototype.toString.call(value) === '[object Object]'
 const unsafeObjectKeys = new Set(['__proto__', 'constructor', 'prototype'])
+const sessionSources = new Set(['quad-box', 'docct', 'syllogimous'])
 
 const finiteNumber = (value, field, { min = -Infinity, max = Infinity } = {}) => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
@@ -117,11 +118,58 @@ const sanitizeDocct = (docct) => {
   return sanitized
 }
 
+const sanitizeCategoryCounts = (counts, totalAnswers) => {
+  if (!isPlainObject(counts)) throw new SessionBackupError('Invalid Syllogimous category counts')
+  const sanitized = {}
+  let total = 0
+  for (const [category, count] of Object.entries(counts)) {
+    if (!category || category.length > 100 || unsafeObjectKeys.has(category)) {
+      throw new SessionBackupError('Invalid Syllogimous category')
+    }
+    const value = integerNumber(count, `${category} question count`, { min: 0, max: MAX_COUNT })
+    sanitized[category] = value
+    total += value
+  }
+  if (total !== totalAnswers) throw new SessionBackupError('Invalid Syllogimous category counts')
+  return sanitized
+}
+
+const sanitizeSyllogimous = (syllogimous) => {
+  if (syllogimous === undefined || syllogimous === null) return undefined
+  if (!isPlainObject(syllogimous)) throw new SessionBackupError('Invalid Syllogimous session data')
+
+  const startedAt = requiredString(syllogimous.startedAt, 'Syllogimous start time')
+  const completedAt = requiredString(syllogimous.completedAt, 'Syllogimous completion time')
+  const startTimestamp = new Date(startedAt).getTime()
+  const completedTimestamp = new Date(completedAt).getTime()
+  if (!Number.isFinite(startTimestamp) || !Number.isFinite(completedTimestamp) || startTimestamp > completedTimestamp) {
+    throw new SessionBackupError('Invalid Syllogimous session times')
+  }
+
+  const correctCount = integerNumber(syllogimous.correctCount, 'Syllogimous correct count', { min: 0, max: MAX_COUNT })
+  const totalAnswers = integerNumber(syllogimous.totalAnswers, 'Syllogimous answer count', { min: 1, max: MAX_COUNT })
+  if (correctCount > totalAnswers) throw new SessionBackupError('Invalid Syllogimous answer counts')
+
+  return {
+    sessionId: requiredString(syllogimous.sessionId, 'Syllogimous session ID'),
+    startedAt,
+    completedAt,
+    durationSec: finiteNumber(syllogimous.durationSec, 'Syllogimous duration', { min: 0, max: MAX_DURATION_SECONDS }),
+    mode: requiredString(syllogimous.mode, 'Syllogimous mode', 100),
+    correctCount,
+    totalAnswers,
+    averageResponseTimeMs: finiteNumber(syllogimous.averageResponseTimeMs, 'Syllogimous response time', { min: 0, max: MAX_INTERVAL_MS }),
+    averagePremises: finiteNumber(syllogimous.averagePremises, 'Syllogimous premise count', { min: 0, max: MAX_COUNT }),
+    categoryCounts: sanitizeCategoryCounts(syllogimous.categoryCounts, totalAnswers),
+  }
+}
+
 export function toPortableSession(game) {
   if (!isPlainObject(game)) throw new SessionBackupError('Invalid session record')
   if (game.status !== 'completed') throw new SessionBackupError('Only completed sessions can be imported')
 
-  const source = game.source === 'docct' ? 'docct' : 'quad-box'
+  const source = game.source ?? 'quad-box'
+  if (!sessionSources.has(source)) throw new SessionBackupError('Invalid session source')
   const title = requiredString(game.title, 'session title')
   const mode = requiredString(game.mode ?? title, 'session mode')
   const variant = requiredString(game.variant ?? title, 'session variant')
@@ -141,10 +189,13 @@ export function toPortableSession(game) {
     title,
     mode,
     variant,
-    nBack: finiteNumber(game.nBack, 'n-back level', { min: 0, max: 100 }),
     tags,
     scores: sanitizeScores(game.scores, tallyMode),
     completedTrials: integerNumber(game.completedTrials, 'completed trials', { min: 0, max: MAX_COUNT }),
+  }
+
+  if (source !== 'syllogimous' || game.nBack !== undefined) {
+    sanitized.nBack = finiteNumber(game.nBack, 'n-back level', { min: 0, max: 100 })
   }
 
   const sessionId = optionalString(game.sessionId, 'session ID')
@@ -180,6 +231,18 @@ export function toPortableSession(game) {
       throw new SessionBackupError('DocCT completion time does not match session timestamp')
     }
     sanitized.docct = docct
+  }
+  const syllogimous = sanitizeSyllogimous(game.syllogimous)
+  if (syllogimous) {
+    if (source !== 'syllogimous' || new Date(syllogimous.completedAt).getTime() !== timestamp) {
+      throw new SessionBackupError('Syllogimous completion time does not match session timestamp')
+    }
+    if (new Date(syllogimous.startedAt).getTime() !== sanitized.start) {
+      throw new SessionBackupError('Syllogimous start time does not match session start')
+    }
+    sanitized.syllogimous = syllogimous
+  } else if (source === 'syllogimous') {
+    throw new SessionBackupError('Syllogimous session data is required')
   }
   return sanitized
 }
@@ -232,7 +295,7 @@ export function parseSessionBackup(text) {
   }
 
   if (!isPlainObject(parsed)) throw new SessionBackupError('Backup must be a JSON object')
-  if (parsed.schemaVersion !== SESSION_BACKUP_SCHEMA_VERSION) {
+  if (parsed.schemaVersion !== 1 && parsed.schemaVersion !== SESSION_BACKUP_SCHEMA_VERSION) {
     throw new SessionBackupError(`Unsupported backup version: ${parsed.schemaVersion ?? 'missing'}`)
   }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import fc from 'fast-check'
 import {
+  SESSION_BACKUP_SCHEMA_VERSION,
   createSessionBackup,
   parseSessionBackup,
   planSessionMerge,
@@ -33,6 +34,37 @@ const sessionArbitrary = fc.record({
   total: { hits, misses, possible: hits + misses, percent: 0.5 },
   ncalc: 2.8,
 }))
+
+const syllogimousSession = () => {
+  const startedAt = '2026-08-23T11:58:30.000Z'
+  const completedAt = '2026-08-23T12:00:00.000Z'
+  return {
+    sessionId: 'df4c3285-e8c7-4b45-b09b-8a80db7fdd1c',
+    sourceSessionId: 'df4c3285-e8c7-4b45-b09b-8a80db7fdd1c',
+    source: 'syllogimous',
+    timestamp: new Date(completedAt).getTime(),
+    start: new Date(startedAt).getTime(),
+    status: 'completed',
+    title: 'syllogimous syllogism',
+    mode: 'syllogimous',
+    variant: 'syllogism',
+    tags: ['answer'],
+    scores: { answer: { hits: 7, misses: 3, possible: 10 } },
+    completedTrials: 10,
+    syllogimous: {
+      sessionId: 'df4c3285-e8c7-4b45-b09b-8a80db7fdd1c',
+      startedAt,
+      completedAt,
+      durationSec: 90,
+      mode: 'syllogism',
+      correctCount: 7,
+      totalAnswers: 10,
+      averageResponseTimeMs: 1250,
+      averagePremises: 3.4,
+      categoryCounts: { syllogism: 10 },
+    },
+  }
+}
 
 describe('session backup codec', () => {
   it('round-trips portable session data and removes local/derived fields', () => {
@@ -77,13 +109,59 @@ describe('session backup codec', () => {
     expect(parsed.games).toEqual([tally])
   })
 
+  it('emits schema v2 and round-trips Syllogimous session metadata', () => {
+    const game = syllogimousSession()
+    const serialized = serializeSessionBackup([game], '2026-08-23T12:05:00.000Z')
+    const parsed = parseSessionBackup(serialized)
+
+    expect(parsed.schemaVersion).toBe(SESSION_BACKUP_SCHEMA_VERSION)
+    expect(parsed.schemaVersion).toBe(2)
+    expect(parsed.games).toEqual([game])
+    expect(parsed.games[0]).not.toHaveProperty('nBack')
+  })
+
+  it('accepts a schema v1 backup and upgrades it to the current schema', () => {
+    const legacyGame = {
+      sessionId: '5fefbd56-652f-4e98-bc47-a3d726fd33c6',
+      timestamp: 1_700_000_000_000,
+      status: 'completed',
+      title: 'dual',
+      mode: 'dual',
+      variant: 'dual',
+      nBack: 2,
+      tags: ['position'],
+      scores: { position: { hits: 8, misses: 2 } },
+      completedTrials: 10,
+      trialTime: 2500,
+    }
+    const parsed = parseSessionBackup(JSON.stringify({
+      schemaVersion: 1,
+      exportedAt: '2026-08-23T12:00:00.000Z',
+      games: [legacyGame],
+    }))
+
+    expect(parsed.schemaVersion).toBe(2)
+    expect(parsed.games).toEqual([{ source: 'quad-box', ...legacyGame }])
+  })
+
   it('rejects malformed JSON and unsupported backup versions', () => {
     expect(() => parseSessionBackup('{broken')).toThrow('not valid JSON')
     expect(() => parseSessionBackup(JSON.stringify({
-      schemaVersion: 2,
+      schemaVersion: 3,
       exportedAt: '2026-08-23T12:00:00.000Z',
       games: [],
     }))).toThrow('Unsupported backup version')
+  })
+
+  it('rejects unknown trainer sources instead of treating them as Quad Box', () => {
+    const game = fc.sample(sessionArbitrary, 1)[0]
+    game.source = 'unknown-trainer'
+
+    expect(() => parseSessionBackup(JSON.stringify({
+      schemaVersion: 2,
+      exportedAt: '2026-08-23T12:00:00.000Z',
+      games: [game],
+    }))).toThrow('Invalid session source')
   })
 
   it('rejects prototype-related keys in imported score maps', () => {

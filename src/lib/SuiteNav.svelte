@@ -1,5 +1,5 @@
 <script>
-  import { Box, ChartNoAxesCombined, Sigma } from '@lucide/svelte'
+  import { Box, ChartNoAxesCombined, Network, Sigma } from '@lucide/svelte'
 
   export let active = 'quad-box'
   export let locked = false
@@ -8,6 +8,7 @@
   const views = [
     { id: 'quad-box', label: 'Quad Box', icon: Box },
     { id: 'docct', label: 'DocCT', icon: Sigma },
+    { id: 'syllogimous', label: 'Syllogimous', icon: Network },
     { id: 'statistics', label: 'Statistics', icon: ChartNoAxesCombined },
   ]
 </script>
@@ -31,7 +32,7 @@
           on:click={() => onNavigate(view.id)}
         >
           <svelte:component this={view.icon} size={17} strokeWidth={1.8} />
-          <span class="truncate">{view.label}</span>
+          <span class="hidden truncate sm:inline">{view.label}</span>
         </button>
       {/each}
     </nav>

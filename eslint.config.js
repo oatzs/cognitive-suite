@@ -6,7 +6,7 @@ import svelteConfig from './svelte.config.js'
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'release/**', 'node_modules/**', 'netlify/**'],
+    ignores: ['dist/**', 'release/**', 'node_modules/**', 'netlify/**', 'public/syllogimous/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

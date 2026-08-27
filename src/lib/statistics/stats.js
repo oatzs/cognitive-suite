@@ -23,13 +23,27 @@ const titleCase = (value) => String(value || '')
   .replace(/\b\w/g, (letter) => letter.toUpperCase())
 
 export function normalizeGame(game) {
-  const source = game.source === 'docct' ? 'docct' : 'quad-box'
+  const source = game.source === 'docct'
+    ? 'docct'
+    : game.source === 'syllogimous'
+      ? 'syllogimous'
+      : 'quad-box'
   const timestamp = numberOrNull(game.timestamp) ?? Date.now()
-  const accuracy = numberOrNull(game.total?.percent) ?? numberOrNull(game.docct?.accuracy) ?? 0
-  const hits = numberOrNull(game.total?.hits) ?? numberOrNull(game.docct?.correctCount) ?? 0
-  const possible = numberOrNull(game.total?.possible) ?? numberOrNull(game.docct?.totalAnswers) ?? 0
+  const hits = numberOrNull(game.total?.hits)
+    ?? numberOrNull(game.docct?.correctCount)
+    ?? numberOrNull(game.syllogimous?.correctCount)
+    ?? 0
+  const possible = numberOrNull(game.total?.possible)
+    ?? numberOrNull(game.docct?.totalAnswers)
+    ?? numberOrNull(game.syllogimous?.totalAnswers)
+    ?? 0
+  const accuracy = numberOrNull(game.total?.percent)
+    ?? numberOrNull(game.docct?.accuracy)
+    ?? (possible > 0 ? hits / possible : 0)
   const recordedVariant = source === 'docct'
     ? game.variant || game.docct?.mode || '1-back'
+    : source === 'syllogimous'
+      ? game.variant || game.syllogimous?.mode || 'mixed'
     : game.variant || game.title || game.mode || 'custom'
   const variant = source === 'quad-box' && (recordedVariant === 'tri' || String(recordedVariant).toLowerCase().startsWith('custom'))
     ? 'custom'
@@ -52,7 +66,7 @@ export function normalizeGame(game) {
   return {
     id: game.id,
     source,
-    sourceLabel: source === 'docct' ? 'DocCT' : 'Quad Box',
+    sourceLabel: source === 'docct' ? 'DocCT' : source === 'syllogimous' ? 'Syllogimous' : 'Quad Box',
     timestamp,
     completedAt: new Date(timestamp),
     day: getGameDay(timestamp),
@@ -62,14 +76,15 @@ export function normalizeGame(game) {
     modeLabel: source === 'docct' ? titleCase(variant) : titleCase(variant),
     nLevel: numberOrNull(game.nBack),
     accuracy,
-    durationSec: Math.max(0, numberOrNull(game.elapsedSeconds) ?? numberOrNull(game.docct?.durationSec) ?? 0),
+    durationSec: Math.max(0, numberOrNull(game.elapsedSeconds) ?? numberOrNull(game.docct?.durationSec) ?? numberOrNull(game.syllogimous?.durationSec) ?? 0),
     hits,
     possible,
     modalities,
     fastestIntervalMs: numberOrNull(game.docct?.fastestIntervalMs),
     endingIntervalMs: numberOrNull(game.docct?.endingIntervalMs),
-    responseTimeMs: numberOrNull(game.docct?.averageResponseTimeMs),
+    responseTimeMs: numberOrNull(game.docct?.averageResponseTimeMs) ?? numberOrNull(game.syllogimous?.averageResponseTimeMs),
     streaks: numberOrNull(game.docct?.streaks),
+    averagePremises: numberOrNull(game.syllogimous?.averagePremises),
     raw: game,
   }
 }
@@ -86,10 +101,10 @@ const primaryProgressModes = [
 ]
 
 export function getProgressModeOptions(sessions, source = 'all') {
-  if (source === 'docct') {
+  if (source === 'docct' || source === 'syllogimous') {
     const options = new Map()
     for (const session of sessions) {
-      if (session.source !== 'docct' || options.has(session.modeKey)) continue
+      if (session.source !== source || options.has(session.modeKey)) continue
       options.set(session.modeKey, {
         key: session.modeKey,
         label: session.modeLabel,

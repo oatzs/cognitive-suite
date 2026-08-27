@@ -4,7 +4,9 @@ import fc from 'fast-check'
 import {
   addDocctSession,
   addImportedGames,
+  addSyllogimousSession,
   deleteDB,
+  deleteGamesBySource,
   getAllCompletedGames,
   getTrainingSummarySince4AM,
 } from '../src/lib/gamedb.js'
@@ -31,6 +33,19 @@ const game = (sessionId, timestamp) => ({
   scores: { position: { hits: 8, misses: 2 } },
   completedTrials: 10,
   trialTime: 2500,
+})
+
+const syllogimousSession = (timestamp = Date.now()) => ({
+  sessionId: 'syllogimous-session-a',
+  startedAt: new Date(timestamp - 90_000).toISOString(),
+  completedAt: new Date(timestamp).toISOString(),
+  durationSec: 90,
+  mode: 'syllogism',
+  correctCount: 7,
+  totalAnswers: 10,
+  averageResponseTimeMs: 1250,
+  averagePremises: 3.4,
+  categoryCounts: { syllogism: 10 },
 })
 
 describe('imported game persistence', () => {
@@ -78,6 +93,51 @@ describe('imported game persistence', () => {
       sessionId: `docct:${completedAt}`,
     })).resolves.toBe(false)
     await expect(getAllCompletedGames()).resolves.toHaveLength(1)
+  })
+
+  it('adds a Syllogimous session once and includes it in today’s training summary', async () => {
+    const session = syllogimousSession()
+
+    await expect(addSyllogimousSession(session)).resolves.toBe(true)
+    await expect(addSyllogimousSession(structuredClone(session))).resolves.toBe(false)
+
+    const stored = await getAllCompletedGames()
+    expect(stored).toHaveLength(1)
+    expect(stored[0]).toMatchObject({
+      sessionId: 'syllogimous-session-a',
+      source: 'syllogimous',
+      sourceSessionId: 'syllogimous-session-a',
+      status: 'completed',
+      title: 'syllogimous syllogism',
+      mode: 'syllogimous',
+      variant: 'syllogism',
+      completedTrials: 10,
+      elapsedSeconds: 90,
+      total: { hits: 7, misses: 3, possible: 10, percent: 0.7 },
+      syllogimous: {
+        mode: 'syllogism',
+        correctCount: 7,
+        totalAnswers: 10,
+        averageResponseTimeMs: 1250,
+        averagePremises: 3.4,
+        categoryCounts: { syllogism: 10 },
+      },
+    })
+    await expect(getTrainingSummarySince4AM()).resolves.toEqual({
+      playTime: 90,
+      sessionCount: 1,
+    })
+  })
+
+  it('clears Syllogimous statistics without deleting another trainer’s history', async () => {
+    const now = Date.now()
+    await addImportedGames([game('quad-session', now)])
+    await addSyllogimousSession(syllogimousSession(now))
+
+    await expect(deleteGamesBySource('syllogimous')).resolves.toBe(1)
+    const stored = await getAllCompletedGames()
+    expect(stored).toHaveLength(1)
+    expect(stored[0].sessionId).toBe('quad-session')
   })
 
   it('counts only completed sessions in the current training day', async () => {

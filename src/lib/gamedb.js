@@ -156,6 +156,87 @@ export async function addDocctSession(session) {
   })
 }
 
+export async function addSyllogimousSession(session) {
+  const completedAt = new Date(session.completedAt)
+  const startedAt = new Date(session.startedAt)
+  if (!Number.isFinite(completedAt.getTime()) || !Number.isFinite(startedAt.getTime())) return false
+  if (startedAt > completedAt) return false
+
+  const completedTrials = Math.max(0, Math.floor(Number(session.totalAnswers) || 0))
+  if (completedTrials === 0) return false
+  const hits = Math.min(completedTrials, Math.max(0, Math.floor(Number(session.correctCount) || 0)))
+  const timestamp = completedAt.getTime()
+  const startTimestamp = Math.max(timestamp - 86_400_000, startedAt.getTime())
+  const durationSec = (timestamp - startTimestamp) / 1000
+  const mode = typeof session.mode === 'string' && session.mode ? session.mode.slice(0, 100) : 'mixed'
+  const sourceSessionId = typeof session.sessionId === 'string' && session.sessionId
+    ? session.sessionId.slice(0, 256)
+    : `${startedAt.toISOString()}:${completedAt.toISOString()}`
+  const categoryCounts = {}
+  for (const [category, count] of Object.entries(session.categoryCounts || {})) {
+    const value = Math.max(0, Math.floor(Number(count) || 0))
+    if (!category || category.length > 100 || ['__proto__', 'constructor', 'prototype'].includes(category)) continue
+    categoryCounts[category] = value
+  }
+  if (Object.values(categoryCounts).reduce((sum, count) => sum + count, 0) !== completedTrials) {
+    for (const category of Object.keys(categoryCounts)) delete categoryCounts[category]
+    categoryCounts[mode] = completedTrials
+  }
+  const record = {
+    sessionId: sourceSessionId,
+    source: 'syllogimous',
+    sourceSessionId,
+    timestamp,
+    start: startTimestamp,
+    status: 'completed',
+    title: `syllogimous ${mode}`,
+    mode: 'syllogimous',
+    variant: mode,
+    tags: ['answer'],
+    scores: { answer: { hits, misses: completedTrials - hits } },
+    completedTrials,
+    syllogimous: {
+      sessionId: sourceSessionId,
+      startedAt: new Date(startTimestamp).toISOString(),
+      completedAt: completedAt.toISOString(),
+      durationSec,
+      mode,
+      correctCount: hits,
+      totalAnswers: completedTrials,
+      averageResponseTimeMs: Math.min(86_400_000, Math.max(0, Number(session.averageResponseTimeMs) || 0)),
+      averagePremises: Math.min(1_000_000, Math.max(0, Number(session.averagePremises) || 0)),
+      categoryCounts,
+    },
+  }
+
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite")
+    const store = tx.objectStore(STORE_NAME)
+    const existing = store.index("source_session").getKey(['syllogimous', sourceSessionId])
+    let added = false
+
+    existing.onsuccess = () => {
+      if (existing.result === undefined) {
+        store.add(record)
+        added = true
+      }
+    }
+    tx.oncomplete = () => {
+      db.close()
+      resolve(added)
+    }
+    tx.onerror = () => {
+      db.close()
+      reject(tx.error)
+    }
+    tx.onabort = () => {
+      db.close()
+      reject(tx.error)
+    }
+  })
+}
+
 export async function getLastRecentGame() {
   const db = await openDB()
   const tx = db.transaction(STORE_NAME, "readonly")
@@ -170,7 +251,8 @@ export async function getLastRecentGame() {
 
     cursorRequest.onsuccess = (event) => {
       const cursor = event.target.result
-      if (cursor && cursor.value.status === "tombstone") {
+      const isQuadBox = cursor && (!cursor.value.source || cursor.value.source === 'quad-box')
+      if (cursor && (cursor.value.status === "tombstone" || !isQuadBox)) {
         cursor.continue()
       } else if (cursor) {
         addScoreMetadata(cursor.value)
@@ -215,6 +297,39 @@ export async function getAllCompletedGames() {
     cursorRequest.onerror = () => {
       db.close()
       reject(cursorRequest.error)
+    }
+  })
+}
+
+export async function deleteGamesBySource(source) {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite")
+    const store = tx.objectStore(STORE_NAME)
+    const cursorRequest = store.openCursor()
+    let deleted = 0
+
+    cursorRequest.onsuccess = (event) => {
+      const cursor = event.target.result
+      if (!cursor) return
+      const recordSource = cursor.value.source || 'quad-box'
+      if (recordSource === source) {
+        cursor.delete()
+        deleted++
+      }
+      cursor.continue()
+    }
+    tx.oncomplete = () => {
+      db.close()
+      resolve(deleted)
+    }
+    tx.onerror = () => {
+      db.close()
+      reject(tx.error)
+    }
+    tx.onabort = () => {
+      db.close()
+      reject(tx.error)
     }
   })
 }

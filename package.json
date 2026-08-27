@@ -1,8 +1,8 @@
 {
   "name": "quad-box",
   "private": true,
-  "version": "1.4.0",
-  "description": "Quad Box and DocCT cognitive training with unified statistics",
+  "version": "1.5.0",
+  "description": "Quad Box, DocCT, and Syllogimous cognitive training with unified statistics",
   "author": "The Quad Box Project Contributors",
   "desktopName": "org.quadbox.cognitive-suite",
   "main": "desktop/main.cjs",
