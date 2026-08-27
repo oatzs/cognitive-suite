@@ -95,8 +95,8 @@ onMount(() => {
       {/if}
     </div>
     <div class="justify-self-end flex items-center gap-4 pr-2 whitespace-nowrap">
-      {#if !$isPlaying && !$mobile && $analytics.playTime}
-      <div>Today: {$analytics.playTime}</div>
+      {#if !$isPlaying && !$mobile && ($analytics.playTime || $analytics.sessionCount)}
+      <div>Today: {$analytics.playTime || '0m 00s'} · {$analytics.sessionCount || 0} session{$analytics.sessionCount === 1 ? '' : 's'}</div>
       {/if}
       {#if $scores.total && !$isPlaying && !$mobile}
         <div>Last: {($scores.total.percent * 100).toFixed(0)}%</div>

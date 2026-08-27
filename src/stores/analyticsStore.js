@@ -1,23 +1,38 @@
 import { writable } from 'svelte/store'
-import { addGame, getLastRecentGame, getPlayTimeSince4AM  } from '../lib/gamedb'
+import { addGame, getLastRecentGame, getTrainingSummarySince4AM } from '../lib/gamedb'
 import { formatSeconds } from '../lib/utils'
 
 const loadAnalytics = async () => {
-  const lastGame = await getLastRecentGame()
-  const playTime = await getPlayTimeSince4AM()
+  const [lastGame, daily] = await Promise.all([
+    getLastRecentGame(),
+    getTrainingSummarySince4AM(),
+  ])
 
   return {
     lastGame,
-    playTime: playTime > 0 ? formatSeconds(playTime) : null,
+    playTime: daily.playTime > 0 ? formatSeconds(daily.playTime) : null,
+    sessionCount: daily.sessionCount,
+  }
+}
+
+const loadDailyAnalytics = async () => {
+  const daily = await getTrainingSummarySince4AM()
+  return {
+    playTime: daily.playTime > 0 ? formatSeconds(daily.playTime) : null,
+    sessionCount: daily.sessionCount,
   }
 }
 
 const createAnalyticsStore = () => {
-  const { subscribe, set } = writable({})
+  const { subscribe, set, update } = writable({})
 
   loadAnalytics().then(analytics => set(analytics))
   return {
     subscribe,
+    refreshDaily: async () => {
+      const daily = await loadDailyAnalytics()
+      update(current => ({ ...current, ...daily }))
+    },
     scoreTrials: async (gameInfo, scoresheet, status) => {
       const scores = {}
       for (const tag of gameInfo.tags) {

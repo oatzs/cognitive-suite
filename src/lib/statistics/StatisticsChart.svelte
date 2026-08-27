@@ -29,6 +29,7 @@
     if (unit === 'percent') return `${value.toFixed(0)}%`
     if (unit === 'seconds') return `${value.toFixed(2)}s`
     if (unit === 'milliseconds') return `${value.toFixed(0)}ms`
+    if (unit === 'count') return value.toFixed(0)
     return value.toFixed(2)
   }
 
@@ -39,10 +40,18 @@
     if (points.length < 2) return
 
     const palette = colors()
-    chart = new Chart(canvas, {
-      type: 'line',
-      data: {
-        datasets: [
+    const datasets = metric === 'sessions'
+      ? [{
+          label: 'Sessions',
+          data: points.map((point) => ({ x: point.day, y: point.count })),
+          borderColor: '#2563eb',
+          backgroundColor: '#2563eb',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          tension: 0.18,
+        }]
+      : [
           {
             label: 'Daily average',
             data: points.map((point) => ({ x: point.day, y: point.average })),
@@ -63,8 +72,10 @@
             pointHoverRadius: 5,
             tension: 0.18,
           },
-        ],
-      },
+        ]
+    chart = new Chart(canvas, {
+      type: 'line',
+      data: { datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -79,11 +90,12 @@
             title: { display: true, text: 'Date', color: palette.text },
           },
           y: {
-            beginAtZero: unit === 'percent',
+            beginAtZero: unit === 'percent' || unit === 'count',
             suggestedMax: unit === 'percent' ? 100 : undefined,
             max: unit === 'percent' ? 100 : undefined,
             ticks: {
               color: palette.text,
+              precision: unit === 'count' ? 0 : undefined,
               callback: (value) => valueLabel(Number(value)),
             },
             grid: { color: palette.grid },

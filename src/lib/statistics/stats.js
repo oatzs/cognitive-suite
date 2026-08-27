@@ -3,6 +3,7 @@ import { getGameDay } from '../utils'
 export const DEFAULT_THRESHOLDS = { advance: 80, fallback: 50 }
 
 export const METRICS = {
+  sessions: { label: 'Sessions per day', shortLabel: 'Sessions', unit: 'count', precision: 0 },
   adjusted: { label: 'Threshold score', shortLabel: 'Score', unit: 'score', precision: 2 },
   n: { label: 'N level', shortLabel: 'N', unit: 'score', precision: 2 },
   accuracy: { label: 'Accuracy', shortLabel: 'Accuracy', unit: 'percent', precision: 0 },
@@ -27,9 +28,12 @@ export function normalizeGame(game) {
   const accuracy = numberOrNull(game.total?.percent) ?? numberOrNull(game.docct?.accuracy) ?? 0
   const hits = numberOrNull(game.total?.hits) ?? numberOrNull(game.docct?.correctCount) ?? 0
   const possible = numberOrNull(game.total?.possible) ?? numberOrNull(game.docct?.totalAnswers) ?? 0
-  const variant = source === 'docct'
+  const recordedVariant = source === 'docct'
     ? game.variant || game.docct?.mode || '1-back'
     : game.variant || game.title || game.mode || 'custom'
+  const variant = source === 'quad-box' && (recordedVariant === 'tri' || String(recordedVariant).toLowerCase().startsWith('custom'))
+    ? 'custom'
+    : recordedVariant
 
   const modalities = Object.entries(game.scores || {})
     .filter(([key]) => key !== 'tally' || source === 'quad-box')
@@ -78,23 +82,45 @@ export const normalizeGames = (games) => games
 const primaryProgressModes = [
   { key: 'quad-box:dual', label: 'Dual N-back', source: 'quad-box' },
   { key: 'quad-box:quad', label: 'Quad N-back', source: 'quad-box' },
+  { key: 'quad-box:custom', label: 'Custom N-back', source: 'quad-box' },
 ]
 
 export function getProgressModeOptions(sessions, source = 'all') {
-  if (source !== 'docct') return primaryProgressModes.map((option) => ({ ...option }))
+  if (source === 'docct') {
+    const options = new Map()
+    for (const session of sessions) {
+      if (session.source !== 'docct' || options.has(session.modeKey)) continue
+      options.set(session.modeKey, {
+        key: session.modeKey,
+        label: session.modeLabel,
+        source: session.source,
+      })
+    }
+    return [...options.values()].sort((a, b) => a.label.localeCompare(b.label))
+  }
 
-  const options = new Map()
+  const options = new Map(primaryProgressModes.map((option) => [option.key, { ...option }]))
   for (const session of sessions) {
-    if (session.source !== 'docct') continue
-    if (options.has(session.modeKey)) continue
+    const isTally = session.raw?.mode === 'tally' || String(session.variant || '').startsWith('tally')
+    if (session.source !== 'quad-box' || isTally || options.has(session.modeKey)) continue
     options.set(session.modeKey, {
       key: session.modeKey,
-      label: session.modeLabel,
+      label: `${session.modeLabel} N-back`,
       source: session.source,
     })
   }
 
-  return [...options.values()].sort((a, b) => a.label.localeCompare(b.label))
+  const primaryOrder = new Map(primaryProgressModes.map((option, index) => [option.key, index]))
+  return [...options.values()].sort((a, b) => {
+    const aOrder = primaryOrder.get(a.key)
+    const bOrder = primaryOrder.get(b.key)
+    if (aOrder !== undefined || bOrder !== undefined) {
+      if (aOrder === undefined) return 1
+      if (bOrder === undefined) return -1
+      return aOrder - bOrder
+    }
+    return a.label.localeCompare(b.label)
+  })
 }
 
 export function chooseInitialProgressMode(options, sessions) {
@@ -116,6 +142,8 @@ export function metricValue(session, metric, thresholds = DEFAULT_THRESHOLDS) {
   const n = session.nLevel
 
   switch (metric) {
+    case 'sessions':
+      return 1
     case 'adjusted': {
       if (!Number.isFinite(n) || thresholds.advance === thresholds.fallback) return null
       return n + ((accuracy * 100) - thresholds.fallback) / (thresholds.advance - thresholds.fallback)
@@ -159,12 +187,15 @@ export function groupDaily(sessions, metric, thresholds = DEFAULT_THRESHOLDS) {
 
   const lowerIsBetter = Boolean(METRICS[metric]?.lowerIsBetter)
   return [...grouped.entries()]
-    .map(([day, values]) => ({
-      day,
-      average: values.reduce((sum, value) => sum + value, 0) / values.length,
-      best: lowerIsBetter ? Math.min(...values) : Math.max(...values),
-      count: values.length,
-    }))
+    .map(([day, values]) => {
+      const count = values.length
+      return {
+        day,
+        average: metric === 'sessions' ? count : values.reduce((sum, value) => sum + value, 0) / count,
+        best: metric === 'sessions' ? count : lowerIsBetter ? Math.min(...values) : Math.max(...values),
+        count,
+      }
+    })
     .sort((a, b) => a.day.localeCompare(b.day))
 }
 
@@ -272,5 +303,6 @@ export function formatMetric(value, metric) {
   if (config.unit === 'percent') return `${value.toFixed(config.precision)}%`
   if (config.unit === 'seconds') return `${value.toFixed(config.precision)}s`
   if (config.unit === 'milliseconds') return `${value.toFixed(config.precision)}ms`
+  if (config.unit === 'count') return value.toFixed(0)
   return value.toFixed(config.precision)
 }

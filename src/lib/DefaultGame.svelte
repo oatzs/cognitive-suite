@@ -105,7 +105,8 @@ const startGame = async () => {
 }
 
 const finalizeGame = async (status) => {
-  const gameInfoRecord = { ...gameMeta, timestamp: Date.now() }
+  const variant = sessionSettings.mode?.startsWith('custom') ? 'custom' : sessionSettings.mode
+  const gameInfoRecord = { ...gameMeta, variant, timestamp: Date.now() }
   if (trialsIndex > gameInfoRecord.nBack) {
     await analytics.scoreTrials(gameInfoRecord, status === 'completed' ? scoresheet : scoresheet.slice(0, trialsIndex), status)
     if (status === 'completed') {

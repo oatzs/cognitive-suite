@@ -7,6 +7,7 @@ import SuiteNav from "./lib/SuiteNav.svelte"
 import { settings } from "./stores/settingsStore"
 import { setMobile } from "./stores/mobileStore"
 import { isPlaying } from "./stores/gameRunningStore"
+import { analytics } from "./stores/analyticsStore"
 import { addDocctSession } from "./lib/gamedb"
 import { error } from "./stores/errorStore"
 import { onMount, onDestroy } from "svelte"
@@ -34,13 +35,27 @@ const navigate = (nextView) => {
   }
 }
 
-const persistDocctSession = (session) => {
-  return addDocctSession(session).catch((reason) => {
+const persistDocctSession = async (session) => {
+  let added
+  try {
+    added = await addDocctSession(session)
+  } catch (reason) {
     error.set({
       message: reason?.message || 'Could not save the DocCT session',
       stacktrace: reason?.stack || reason,
     })
-  })
+    return
+  }
+  if (added) {
+    try {
+      await analytics.refreshDaily()
+    } catch (reason) {
+      error.set({
+        message: reason?.message || 'The session was saved, but today’s counters could not be refreshed',
+        stacktrace: reason?.stack || reason,
+      })
+    }
+  }
 }
 
 onMount(() => {

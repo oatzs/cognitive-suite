@@ -39,7 +39,7 @@
   let importing = false
   let transferNotice = null
 
-  const brainWorkshopMetrics = ['adjusted', 'n', 'accuracy', 'nAccuracy', 'weightedAccuracy']
+  const brainWorkshopMetrics = ['sessions', 'adjusted', 'n', 'accuracy', 'nAccuracy', 'weightedAccuracy']
   const docctMetrics = [...brainWorkshopMetrics, 'fastestInterval', 'responseTime']
 
   async function load() {
@@ -74,7 +74,7 @@
   $: progressSource = selectedProgressMode?.source ?? 'quad-box'
   $: if (progressSource !== progressMetricSource) {
     progressMetricSource = progressSource
-    metric = progressSource === 'quad-box' ? 'adjusted' : 'accuracy'
+    if (metric !== 'sessions') metric = progressSource === 'quad-box' ? 'adjusted' : 'accuracy'
   }
   $: metricOptions = progressSource === 'docct' ? docctMetrics : brainWorkshopMetrics
   $: if (!metricOptions.includes(metric)) metric = metricOptions[0]
@@ -88,7 +88,9 @@
   $: recent = filtered.slice(0, 20)
   $: metricConfig = METRICS[metric]
   $: metricValues = filtered.map((session) => metricValue(session, metric, thresholds)).filter(Number.isFinite)
-  $: bestMetric = metricValues.length
+  $: bestMetric = metric === 'sessions'
+    ? (daily.length ? Math.max(...daily.map((point) => point.count)) : null)
+    : metricValues.length
     ? (metricConfig.lowerIsBetter ? Math.min(...metricValues) : Math.max(...metricValues))
     : null
 

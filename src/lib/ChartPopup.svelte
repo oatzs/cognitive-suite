@@ -78,8 +78,8 @@
               <input type="checkbox" class="toggle" checked={$recentGamesState.filter !== 'completed'} on:click={() => $recentGamesState.filter = $recentGamesState.filter === 'completed' ? 'all' : 'completed'} />
             </span>
           {/if}
-          {#if $analytics.playTime}
-            <div>Today: {$analytics.playTime}</div>
+          {#if $analytics.playTime || $analytics.sessionCount}
+            <div>Today: {$analytics.playTime || '0m 00s'} · {$analytics.sessionCount || 0} session{$analytics.sessionCount === 1 ? '' : 's'}</div>
           {/if}
           </div>
         {:else}

@@ -6,9 +6,12 @@
   const DAY_MS = 24 * 60 * 60 * 1000
 
   function makeCells(items) {
-    const minutesByDay = new Map()
+    const activityByDay = new Map()
     for (const session of items) {
-      minutesByDay.set(session.day, (minutesByDay.get(session.day) || 0) + session.durationSec / 60)
+      const activity = activityByDay.get(session.day) || { minutes: 0, sessions: 0 }
+      activity.minutes += session.durationSec / 60
+      activity.sessions++
+      activityByDay.set(session.day, activity)
     }
 
     const end = new Date()
@@ -19,9 +22,9 @@
     return Array.from({ length: 53 * 7 }, (_, index) => {
       const date = new Date(start.getTime() + index * DAY_MS)
       const day = getGameDay(new Date(date).setHours(12, 0, 0, 0))
-      const minutes = minutesByDay.get(day) || 0
+      const { minutes, sessions } = activityByDay.get(day) || { minutes: 0, sessions: 0 }
       const level = minutes === 0 ? 0 : minutes < 10 ? 1 : minutes < 25 ? 2 : minutes < 50 ? 3 : 4
-      return { day, minutes, level }
+      return { day, minutes, sessions, level }
     })
   }
 
@@ -33,8 +36,8 @@
     {#each cells as cell (cell.day)}
       <span
         class="activity-cell activity-level-{cell.level}"
-        title={`${cell.day}: ${Math.round(cell.minutes)} minutes`}
-        aria-label={`${cell.day}, ${Math.round(cell.minutes)} training minutes`}
+        title={`${cell.day}: ${Math.round(cell.minutes)} minutes, ${cell.sessions} session${cell.sessions === 1 ? '' : 's'}`}
+        aria-label={`${cell.day}, ${Math.round(cell.minutes)} training minutes, ${cell.sessions} session${cell.sessions === 1 ? '' : 's'}`}
       ></span>
     {/each}
   </div>

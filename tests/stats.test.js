@@ -81,6 +81,23 @@ describe('session normalization and game days', () => {
     expect(metricValue(normalized, 'fastestInterval')).toBe(0.85)
     expect(metricValue(normalized, 'responseTime')).toBe(410)
   })
+
+  it('groups generated tri configurations under Custom N-back', () => {
+    const normalized = normalizeGame({
+      timestamp: new Date(2026, 0, 6, 12).getTime(),
+      status: 'completed',
+      title: 'tri',
+      nBack: 2,
+      tags: ['position', 'audio', 'color'],
+      scores: {},
+      total: { hits: 0, possible: 0, percent: 0 },
+      elapsedSeconds: 60,
+    })
+
+    expect(normalized.variant).toBe('custom')
+    expect(normalized.modeKey).toBe('quad-box:custom')
+    expect(normalized.modeLabel).toBe('Custom')
+  })
 })
 
 describe('statistics aggregation', () => {
@@ -94,6 +111,17 @@ describe('statistics aggregation', () => {
       { key: 'quad-box:dual', label: 'Dual N-back', source: 'quad-box' },
       { key: 'quad-box:quad', label: 'Quad N-back', source: 'quad-box' },
     ])
+    expect(options).toContainEqual({ key: 'quad-box:custom', label: 'Custom N-back', source: 'quad-box' })
+  })
+
+  it('includes other completed n-back configurations but excludes tally modes', () => {
+    const options = getProgressModeOptions([
+      session({ modeKey: 'quad-box:experimental', modeLabel: 'Experimental', variant: 'experimental' }),
+      session({ modeKey: 'quad-box:tally-dual', modeLabel: 'Tally Dual', variant: 'tally dual' }),
+    ], 'quad-box')
+
+    expect(options).toContainEqual({ key: 'quad-box:experimental', label: 'Experimental N-back', source: 'quad-box' })
+    expect(options.some((option) => option.key === 'quad-box:tally-dual')).toBe(false)
   })
 
   it('initially selects Quad when only Quad has progress data', () => {
@@ -126,6 +154,19 @@ describe('statistics aggregation', () => {
     expect(points).toEqual([
       { day: '2026-01-05', average: 70, best: 90, count: 2 },
       { day: '2026-01-06', average: 70, best: 70, count: 1 },
+    ])
+  })
+
+  it('counts completed sessions per training day', () => {
+    const points = groupDaily([
+      session(),
+      session(),
+      session({ day: '2026-01-06' }),
+    ], 'sessions')
+
+    expect(points).toEqual([
+      { day: '2026-01-05', average: 2, best: 2, count: 2 },
+      { day: '2026-01-06', average: 1, best: 1, count: 1 },
     ])
   })
 

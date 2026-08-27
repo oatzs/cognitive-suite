@@ -6,6 +6,7 @@ import {
   addImportedGames,
   deleteDB,
   getAllCompletedGames,
+  getTrainingSummarySince4AM,
 } from '../src/lib/gamedb.js'
 import { parseSessionBackup, serializeSessionBackup } from '../src/lib/sessionBackup.js'
 import {
@@ -77,6 +78,27 @@ describe('imported game persistence', () => {
       sessionId: `docct:${completedAt}`,
     })).resolves.toBe(false)
     await expect(getAllCompletedGames()).resolves.toHaveLength(1)
+  })
+
+  it('counts only completed sessions in the current training day', async () => {
+    const now = Date.now()
+    await addImportedGames([
+      game('completed-a', now),
+      game('completed-b', now),
+      {
+        ...game('completed-docct', now),
+        source: 'docct',
+        mode: 'docct',
+        variant: '1-back',
+        start: now - 30_000,
+      },
+      { ...game('cancelled', now), status: 'cancelled' },
+    ])
+
+    await expect(getTrainingSummarySince4AM()).resolves.toEqual({
+      playTime: 105,
+      sessionCount: 3,
+    })
   })
 
   it('can store, normalize, summarize, display, and export every generated accepted backup', async () => {

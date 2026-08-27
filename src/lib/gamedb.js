@@ -258,7 +258,7 @@ export async function getGamesTimeRange(start, end) {
   })
 }
 
-export async function getPlayTimeSince4AM() {
+export async function getTrainingSummarySince4AM() {
   const db = await openDB()
   const tx = db.transaction(STORE_NAME, "readonly")
   const store = tx.objectStore(STORE_NAME)
@@ -272,7 +272,7 @@ export async function getPlayTimeSince4AM() {
   }
 
   const lowerBound = fourAM.getTime()
-  const playTime = { total: 0 }
+  const summary = { playTime: 0, sessionCount: 0 }
 
   return new Promise((resolve, reject) => {
     const range = IDBKeyRange.lowerBound(lowerBound)
@@ -283,12 +283,13 @@ export async function getPlayTimeSince4AM() {
       if (cursor) {
         if (cursor.value.status !== "tombstone") {
           addScoreMetadata(cursor.value)
-          playTime.total += cursor.value.elapsedSeconds
+          summary.playTime += cursor.value.elapsedSeconds
+          if (cursor.value.status === 'completed') summary.sessionCount++
         }
         cursor.continue()
       } else {
         db.close()
-        resolve(playTime.total)
+        resolve(summary)
       }
     }
 
@@ -297,6 +298,10 @@ export async function getPlayTimeSince4AM() {
       reject(cursorRequest.error)
     }
   })
+}
+
+export async function getPlayTimeSince4AM() {
+  return (await getTrainingSummarySince4AM()).playTime
 }
 
 export const getYearOfPlayTime = async () => {
