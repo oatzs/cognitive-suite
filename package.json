@@ -1,7 +1,7 @@
 {
   "name": "quad-box",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Quad Box and DocCT cognitive training with unified statistics",
   "author": "The Quad Box Project Contributors",
   "desktopName": "org.quadbox.cognitive-suite",
