@@ -43,7 +43,7 @@ _Statistics are shown with example training data. Unfortunately, mindbuilding pr
 ## Downloads
 
 [Download the latest Cognitive Suite release](https://github.com/oatzs/cognitive-suite/releases/latest).
-Node.js and npm are not required to use these downloads.
+Node.js and npm are not required to use these downloads. Yes, this project is compiled javaslop 😭
 
 - **Windows x64:** download the portable `.exe` and run it directly.
 - **macOS Apple Silicon:** download the `arm64.dmg`, open it, and drag the app to Applications.
