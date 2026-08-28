@@ -396,10 +396,10 @@ export async function getTrainingSummarySince4AM() {
     cursorRequest.onsuccess = (event) => {
       const cursor = event.target.result
       if (cursor) {
-        if (cursor.value.status !== "tombstone") {
+        if (cursor.value.status === 'completed') {
           addScoreMetadata(cursor.value)
           summary.playTime += cursor.value.elapsedSeconds
-          if (cursor.value.status === 'completed') summary.sessionCount++
+          summary.sessionCount++
         }
         cursor.continue()
       } else {
@@ -440,7 +440,7 @@ export const getYearOfPlayTime = async () => {
     cursorRequest.onsuccess = (event) => {
       const cursor = event.target.result
       if (cursor) {
-        if (cursor.value.status !== "tombstone") {
+        if (cursor.value.status === 'completed') {
           addScoreMetadata(cursor.value)
           const day = getGameDay(cursor.value.timestamp)
           if (!games[day]) {

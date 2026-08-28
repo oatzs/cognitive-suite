@@ -87,7 +87,7 @@ export interface Engine {
   start(): void;
   pause(): void;
   resume(): void;
-  stop(): void;
+  quit(): void;
   restart(): void;
   submitAnswer(answer: number): void;
   completeOnboarding(): void;
@@ -763,7 +763,7 @@ export function createEngine(
       // Original checks timeLeft <= 1 BEFORE decrementing
       if (timeLeft <= 1) {
         timeLeft = 0;
-        stopSession();
+        completeSession();
         return;
       }
       timeLeft--;
@@ -773,7 +773,7 @@ export function createEngine(
 
   // ── Session completion ─────────────────────────────────────────────────
 
-  function stopSession(): void {
+  function completeSession(): void {
     if (phase !== 'active' && phase !== 'paused') return;
     phase = 'ending';
     stopTimers();
@@ -832,6 +832,24 @@ export function createEngine(
       isPlayingAudio = false;
       notify();
     }
+  }
+
+  function quitSession(): void {
+    if (phase !== 'active' && phase !== 'paused') return;
+    stopTimers();
+    audioPlayingId++;
+    sessionSettings = null;
+    phase = 'setup';
+    timeLeft = settings.timer;
+    totalTime = settings.timer;
+    currentDigit = null;
+    canAnswer = false;
+    isPlayingAudio = false;
+    pendingAnswer = undefined;
+    expectedAnswer = undefined;
+    digitHistory = [];
+    sessionResults = null;
+    notify();
   }
 
   // ── Public API ─────────────────────────────────────────────────────────
@@ -932,8 +950,8 @@ export function createEngine(
       scheduleNextDigit(0);
     },
 
-    stop() {
-      stopSession();
+    quit() {
+      quitSession();
     },
 
     restart() {

@@ -9,6 +9,7 @@ import {
   deleteGamesBySource,
   getAllCompletedGames,
   getTrainingSummarySince4AM,
+  getYearOfPlayTime,
 } from '../src/lib/gamedb.js'
 import { parseSessionBackup, serializeSessionBackup } from '../src/lib/sessionBackup.js'
 import {
@@ -156,9 +157,12 @@ describe('imported game persistence', () => {
     ])
 
     await expect(getTrainingSummarySince4AM()).resolves.toEqual({
-      playTime: 105,
+      playTime: 80,
       sessionCount: 3,
     })
+
+    const yearlyMinutes = await getYearOfPlayTime()
+    expect(Object.values(yearlyMinutes).reduce((sum, minutes) => sum + minutes, 0)).toBeCloseTo(80 / 60)
   })
 
   it('can store, normalize, summarize, display, and export every generated accepted backup', async () => {

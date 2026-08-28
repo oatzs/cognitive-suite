@@ -601,6 +601,7 @@ describe('Interval adaptation', () => {
 
   it('keeps a fixed interval after a wrong streak', async () => {
     const e = createEngine(makeSettings({
+      timer: 5,
       taskMode: '1-back',
       intervalMode: 'fixed',
       adaptationMode: 'classic',
@@ -618,7 +619,8 @@ describe('Interval adaptation', () => {
     expect(e.getState().wrongStreak).toBe(3);
     expect(e.getState().currentInterval).toBe(500);
 
-    e.stop();
+    vi.advanceTimersByTime(e.getState().timeLeft * 1000);
+    expect(e.getState().phase).toBe('complete');
     expect(e.getState().sessionResults?.intervalMode).toBe('fixed');
     const highScores = JSON.parse(localStorage.getItem('docct:high-scores:v1')!);
     expect(highScores['1-back:fixed']).toBeDefined();
@@ -784,46 +786,49 @@ describe('State machine transitions', () => {
     e.dispose();
   });
 
-  it('active → complete via stop()', async () => {
-    const e = createEngine(makeSettings({ onboardingCompleted: true }));
+  it('quitting an active session returns to setup without recording time or a session', async () => {
+    const onSessionComplete = vi.fn();
+    const e = createEngine(makeSettings({ onboardingCompleted: true }), onSessionComplete);
     await startEngine(e);
-    e.stop();
-    expect(e.getState().phase).toBe('complete');
-    expect(e.getState().sessionResults).not.toBeNull();
+    vi.advanceTimersByTime(2000);
+    e.quit();
+
+    expect(e.getState().phase).toBe('setup');
+    expect(e.getState().sessionResults).toBeNull();
+    expect(e.loadHistory()).toHaveLength(0);
+    expect(onSessionComplete).not.toHaveBeenCalled();
     e.dispose();
   });
 
-  it('records a session only once when completion is requested repeatedly', async () => {
+  it('does not record a session when quit is requested repeatedly', async () => {
     const onSessionComplete = vi.fn();
     const e = createEngine(makeSettings({ onboardingCompleted: true }), onSessionComplete);
     await startEngine(e);
 
-    e.stop();
-    const firstResult = e.getState().sessionResults;
-    e.stop();
-    e.stop();
+    e.quit();
+    e.quit();
+    e.quit();
 
-    expect(e.getState().phase).toBe('complete');
-    expect(e.getState().sessionResults).toEqual(firstResult);
-    expect(e.loadHistory()).toHaveLength(1);
-    expect(onSessionComplete).toHaveBeenCalledTimes(1);
+    expect(e.getState().phase).toBe('setup');
+    expect(e.getState().sessionResults).toBeNull();
+    expect(e.loadHistory()).toHaveLength(0);
+    expect(onSessionComplete).not.toHaveBeenCalled();
     e.dispose();
   });
 
   it('enters the complete phase even when the completion callback fails', async () => {
     const failure = new Error('canonical persistence failed');
     const onSessionComplete = vi.fn(() => { throw failure; });
-    const e = createEngine(makeSettings({ onboardingCompleted: true }), onSessionComplete);
+    const e = createEngine(makeSettings({ onboardingCompleted: true, timer: 1 }), onSessionComplete);
     await startEngine(e);
 
-    expect(() => e.stop()).toThrow(failure);
+    expect(() => tickSecond()).toThrow(failure);
     expect(e.getState()).toEqual(expect.objectContaining({
       phase: 'complete',
       currentDigit: null,
       canAnswer: false,
       isPlayingAudio: false,
     }));
-    expect(() => e.stop()).not.toThrow();
     expect(onSessionComplete).toHaveBeenCalledTimes(1);
     e.dispose();
   });
@@ -854,12 +859,9 @@ describe('State machine transitions', () => {
       minimumInterval: 500,
     }));
 
-    e.stop();
-    expect(e.getState().sessionResults).toEqual(expect.objectContaining({
-      mode: '1-back',
-      intervalMode: 'fixed',
-      endingIntervalMs: 1000,
-    }));
+    e.quit();
+    expect(e.getState().phase).toBe('setup');
+    expect(e.getState().sessionResults).toBeNull();
     e.dispose();
   });
 
@@ -1009,17 +1011,17 @@ describe('Settings persistence', () => {
     e.dispose();
   });
 
-  it('uses an edited duration when a session starts and after restart', async () => {
+  it('uses an edited duration when a session completes and after restart', async () => {
     const e = createEngine(makeSettings({ timer: 600, onboardingCompleted: true }));
-    e.updateSettings({ timer: 300 });
+    e.updateSettings({ timer: 2 });
     await startEngine(e);
     tickSecond();
-    e.stop();
+    tickSecond();
 
-    expect(e.getState().sessionResults?.durationSec).toBe(1);
+    expect(e.getState().sessionResults?.durationSec).toBe(2);
     e.restart();
-    expect(e.getState().timeLeft).toBe(300);
-    expect(e.getState().totalTime).toBe(300);
+    expect(e.getState().timeLeft).toBe(2);
+    expect(e.getState().totalTime).toBe(2);
     e.dispose();
   });
 
