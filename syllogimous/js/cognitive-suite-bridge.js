@@ -82,7 +82,7 @@
         if (!timerToggled && wasRunning) finishSuiteSession();
     };
 
-    window.addEventListener('pagehide', finishSuiteSession);
+    window.addEventListener('pagehide', discardSuiteSession);
     window.addEventListener('syllogimous-reset', discardSuiteSession);
     postToSuite('ready', { active: false });
 })();
