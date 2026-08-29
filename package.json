@@ -43,20 +43,20 @@
     "win": {
       "target": "portable",
       "icon": "build-resources/icon.ico",
-      "artifactName": "Quad-Box-Cognitive-Suite-${version}-Windows-${arch}.${ext}"
+      "artifactName": "Cognitive Suite.${ext}"
     },
     "mac": {
       "target": "dmg",
       "icon": "build-resources/icon.png",
       "category": "public.app-category.education",
-      "artifactName": "Quad-Box-Cognitive-Suite-${version}-macOS-${arch}.${ext}"
+      "artifactName": "Cognitive Suite (${arch}).${ext}"
     },
     "linux": {
       "target": "AppImage",
       "icon": "build-resources/icon.png",
       "category": "Education",
       "syncDesktopName": true,
-      "artifactName": "Quad-Box-Cognitive-Suite-${version}-Linux-${arch}.${ext}"
+      "artifactName": "Cognitive Suite.${ext}"
     }
   },
   "devDependencies": {
