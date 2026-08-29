@@ -4,7 +4,7 @@ Cognitive Suite combines Quad Box nback, DocCT, and Syllogimous relational reaso
 
 If you want to try it out online:
 
-[https://oatzs.github.io/cognitive-suite/](https://oatzs.github.io/cognitive-suite/)
+[https://cognitivesuite.org](https://cognitivesuite.org)
 
 ## QOL Improvements:
 
