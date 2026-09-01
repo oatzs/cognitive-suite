@@ -37,7 +37,7 @@
       {/each}
     </nav>
 
-    <div class="hidden min-w-36 sm:block"></div>
+    <div class="min-w-8 sm:min-w-36" aria-hidden="true"></div>
   </div>
 </header>
 

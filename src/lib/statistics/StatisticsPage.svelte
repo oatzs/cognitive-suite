@@ -5,6 +5,7 @@
   import { formatSeconds } from '../utils'
   import { settings } from '../../stores/settingsStore'
   import ActivityHeatmap from './ActivityHeatmap.svelte'
+  import MeasurePicker from './MeasurePicker.svelte'
   import StatisticsChart from './StatisticsChart.svelte'
   import {
     exportSessionHistoryBackup,
@@ -15,6 +16,7 @@
     METRICS,
     filterSessions,
     formatMetric,
+    getBestThresholdScores,
     getModalityRollups,
     getProgressModeOptions,
     groupDaily,
@@ -88,6 +90,7 @@
   $: if (!metricOptions.includes(metric)) metric = metricOptions[0]
   $: thresholds = { advance: Number($settings.successCriteria) || 80, fallback: Number($settings.failureCriteria) || 50 }
   $: filtered = filterSessions(sessions, { source, mode, range })
+  $: quadBoxSessions = filterSessions(sessions, { source: 'quad-box', range })
   $: progressSessions = filterSessions(sessions, { mode: progressMode, range })
   $: activitySessions = filterSessions(sessions, { source, mode, range: 'all' })
   $: summary = summarizeSessions(filtered)
@@ -96,6 +99,7 @@
   $: recent = filtered.slice(0, 20)
   $: metricConfig = METRICS[metric]
   $: metricValues = filtered.map((session) => metricValue(session, metric, thresholds)).filter(Number.isFinite)
+  $: quadBoxBestScores = getBestThresholdScores(quadBoxSessions, thresholds)
   $: bestMetric = metric === 'sessions'
     ? (daily.length ? Math.max(...daily.map((point) => point.count)) : null)
     : metricValues.length
@@ -265,7 +269,10 @@
     {#if loadError}
       <div class="my-6 border-l-4 border-error bg-error/10 px-4 py-3 text-sm">{loadError}</div>
     {:else}
-      <section aria-label="Summary" class="summary-grid grid grid-cols-2 border-b border-base-300 py-5 md:grid-cols-3 xl:grid-cols-6">
+      <section
+        aria-label="Summary"
+        class="summary-grid grid grid-cols-2 border-b border-base-300 py-5 md:grid-cols-3 {source === 'quad-box' ? 'xl:grid-cols-7' : 'xl:grid-cols-6'}"
+      >
         <div class="summary-item">
           <span>Today</span>
           <strong>{summary.todaySessions} sessions</strong>
@@ -291,11 +298,24 @@
           <strong>{summary.current} days</strong>
           <small>{summary.longest} day best</small>
         </div>
-        <div class="summary-item">
-          <span>Best {metricConfig.shortLabel.toLowerCase()}</span>
-          <strong>{formatMetric(bestMetric, metric)}</strong>
-          <small>{metricConfig.lowerIsBetter ? 'Lowest result' : 'Highest result'}</small>
-        </div>
+        {#if source === 'quad-box'}
+          <div class="summary-item">
+            <span>Best dual score</span>
+            <strong>{formatMetric(quadBoxBestScores.dual, 'adjusted')}</strong>
+            <small>Threshold score</small>
+          </div>
+          <div class="summary-item">
+            <span>Best quad score</span>
+            <strong>{formatMetric(quadBoxBestScores.quad, 'adjusted')}</strong>
+            <small>Threshold score</small>
+          </div>
+        {:else}
+          <div class="summary-item">
+            <span>Best {metricConfig.shortLabel.toLowerCase()}</span>
+            <strong>{formatMetric(bestMetric, metric)}</strong>
+            <small>{metricConfig.lowerIsBetter ? 'Lowest result' : 'Highest result'}</small>
+          </div>
+        {/if}
       </section>
 
       <section class="border-b border-base-300 py-5">
@@ -313,14 +333,16 @@
               <h2 class="text-sm font-semibold">Daily progress</h2>
               <p class="mt-1 text-xs opacity-55">{selectedProgressMode?.label ?? 'Selected mode'} sessions only.</p>
             </div>
-            <label class="stats-control">
-              <span>Measure</span>
-              <select class="select select-sm min-w-48" bind:value={metric}>
-                {#each metricOptions as key (key)}
-                  <option value={key}>{METRICS[key].label}</option>
-                {/each}
-              </select>
-            </label>
+            <div class="stats-control">
+              <span id="measure-picker-label">Measure</span>
+              <MeasurePicker
+                options={metricOptions}
+                value={metric}
+                {thresholds}
+                labelledby="measure-picker-label"
+                onChange={(nextMetric) => metric = nextMetric}
+              />
+            </div>
           </div>
           <div>
             <span class="mb-1 block text-[0.7rem] opacity-60">Progress mode</span>
@@ -501,7 +523,8 @@
   .score-neutral { background: #ca8a04; color: #111827; }
 
   @media (max-width: 1279px) {
-    .summary-item:nth-child(4) {
+    .summary-item:nth-child(4),
+    .summary-item:nth-child(7) {
       border-left: 0;
     }
   }

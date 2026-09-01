@@ -4,6 +4,7 @@ import DefaultGame from "./lib/DefaultGame.svelte"
 import TallyGame from "./lib/TallyGame.svelte"
 import ErrorDisplay from "./lib/ErrorDisplay.svelte"
 import SuiteNav from "./lib/SuiteNav.svelte"
+import CommunityLinks from "./lib/CommunityLinks.svelte"
 import { settings } from "./stores/settingsStore"
 import { setMobile } from "./stores/mobileStore"
 import { isPlaying } from "./stores/gameRunningStore"
@@ -178,6 +179,7 @@ onDestroy(async () => {
       {/await}
     {/if}
   </div>
+  <CommunityLinks />
 </div>
 
 <style>

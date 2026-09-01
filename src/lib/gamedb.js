@@ -4,6 +4,12 @@ const DB_NAME = "QuadBoxNBack"
 const DB_VERSION = 3
 const STORE_NAME = "games"
 
+const isQuadBoxNBackGame = (game) => (
+  (!game.source || game.source === 'quad-box') &&
+  game.mode !== 'tally' &&
+  !String(game.variant || game.title || '').toLowerCase().includes('tally')
+)
+
 const openDB = () => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
@@ -396,7 +402,7 @@ export async function getTrainingSummarySince4AM() {
     cursorRequest.onsuccess = (event) => {
       const cursor = event.target.result
       if (cursor) {
-        if (cursor.value.status === 'completed') {
+        if (cursor.value.status === 'completed' && isQuadBoxNBackGame(cursor.value)) {
           addScoreMetadata(cursor.value)
           summary.playTime += cursor.value.elapsedSeconds
           summary.sessionCount++
@@ -440,7 +446,7 @@ export const getYearOfPlayTime = async () => {
     cursorRequest.onsuccess = (event) => {
       const cursor = event.target.result
       if (cursor) {
-        if (cursor.value.status === 'completed') {
+        if (cursor.value.status === 'completed' && isQuadBoxNBackGame(cursor.value)) {
           addScoreMetadata(cursor.value)
           const day = getGameDay(cursor.value.timestamp)
           if (!games[day]) {

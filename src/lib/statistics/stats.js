@@ -13,6 +13,78 @@ export const METRICS = {
   responseTime: { label: 'Response time', shortLabel: 'Response', unit: 'milliseconds', precision: 0, lowerIsBetter: true },
 }
 
+const metricExplanations = {
+  sessions: {
+    summary: 'Counts completed sessions on each training day.',
+    detail: 'The graph shows the total sessions completed that day; the best value is the busiest day.',
+  },
+  n: {
+    summary: 'Shows the N-back level used; accuracy does not change the value.',
+    formula: 'N',
+    examplesLabel: 'Example:',
+    examples: ['A 2-back session → 2.00'],
+  },
+  accuracy: {
+    summary: 'Shows the percentage of scored answers that were correct.',
+    formula: 'correct answers ÷ possible answers × 100',
+    examplesLabel: 'Example:',
+    examples: ['8 correct out of 10 → 80%'],
+  },
+  nAccuracy: {
+    summary: 'Adds accuracy as a 0–1 decimal to the N-back level.',
+    formula: 'N + accuracy',
+    examplesLabel: 'Example:',
+    examples: ['2-back at 80% → 2.80'],
+  },
+  weightedAccuracy: {
+    summary: 'Weights accuracy so 50% equals N and 100% equals N + 1.',
+    formula: 'N − 1 + (2 × accuracy)',
+    examplesLabel: 'At 2-back:',
+    examples: ['50% → 2.00', '80% → 2.60', '100% → 3.00'],
+  },
+  fastestInterval: {
+    summary: 'Shows the shortest stimulus interval reached during a DocCT session.',
+    detail: 'Measured in seconds. A lower value means the session reached a faster pace.',
+  },
+  responseTime: {
+    summary: 'Shows the average time between a prompt and the response.',
+    detail: 'Measured in milliseconds. A lower value means responses were faster.',
+  },
+}
+
+const formatExplanationPercent = (value) => Number.isInteger(value)
+  ? `${value}%`
+  : `${value.toFixed(1).replace(/\.0$/, '')}%`
+
+export function getMetricExplanation(metric, thresholds = DEFAULT_THRESHOLDS) {
+  if (metric !== 'adjusted') return metricExplanations[metric] ?? { summary: 'Shows this measure for each training day.' }
+
+  const fallback = Number(thresholds.fallback)
+  const advance = Number(thresholds.advance)
+  const validThresholds = Number.isFinite(fallback) && Number.isFinite(advance) && advance !== fallback
+  if (!validThresholds) {
+    return {
+      summary: 'Converts accuracy into an N-level-equivalent score using the fallback and advance thresholds.',
+      detail: 'The fallback and advance thresholds must be different before this score can be calculated.',
+      formula: 'N + (accuracy − fallback threshold) ÷ (advance threshold − fallback threshold)',
+      examples: [],
+    }
+  }
+
+  const midpoint = (fallback + advance) / 2
+  return {
+    summary: 'Converts accuracy into an N-level-equivalent score using the fallback and advance thresholds.',
+    detail: 'At the fallback threshold the score equals N; at the advance threshold it equals N + 1.',
+    formula: 'N + (accuracy − fallback threshold) ÷ (advance threshold − fallback threshold)',
+    examplesLabel: `At 2-back with ${formatExplanationPercent(fallback)}/${formatExplanationPercent(advance)} thresholds:`,
+    examples: [
+      `${formatExplanationPercent(fallback)} → 2.00`,
+      `${formatExplanationPercent(midpoint)} → 2.50`,
+      `${formatExplanationPercent(advance)} → 3.00`,
+    ],
+  }
+}
+
 const numberOrNull = (value) => {
   const number = Number(value)
   return Number.isFinite(number) ? number : null
@@ -212,6 +284,25 @@ export function groupDaily(sessions, metric, thresholds = DEFAULT_THRESHOLDS) {
       }
     })
     .sort((a, b) => a.day.localeCompare(b.day))
+}
+
+const getBestThresholdScore = (sessions, thresholds) => {
+  const values = sessions
+    .map((session) => metricValue(session, 'adjusted', thresholds))
+    .filter(Number.isFinite)
+  return values.length ? Math.max(...values) : null
+}
+
+export function getBestThresholdScores(sessions, thresholds = DEFAULT_THRESHOLDS) {
+  const bestForMode = (modeKey) => getBestThresholdScore(
+    sessions.filter((session) => session.modeKey === modeKey),
+    thresholds,
+  )
+
+  return {
+    dual: bestForMode('quad-box:dual'),
+    quad: bestForMode('quad-box:quad'),
+  }
 }
 
 const calendarOrdinal = (day) => {

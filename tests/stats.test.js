@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   chooseInitialProgressMode,
   filterSessions,
+  getBestThresholdScores,
+  getMetricExplanation,
   getProgressModeOptions,
   getModalityRollups,
   getStreaks,
@@ -45,6 +47,32 @@ describe('Brain Workshop score metrics', () => {
     expect(metricValue(value, 'accuracy')).toBe(75)
     expect(metricValue(value, 'nAccuracy')).toBe(3.75)
     expect(metricValue(value, 'weightedAccuracy')).toBe(3.5)
+  })
+
+  it('explains every available measure', () => {
+    for (const key of [
+      'sessions',
+      'adjusted',
+      'n',
+      'accuracy',
+      'nAccuracy',
+      'weightedAccuracy',
+      'fastestInterval',
+      'responseTime',
+    ]) {
+      expect(getMetricExplanation(key).summary).toBeTruthy()
+    }
+  })
+
+  it('builds threshold-score examples from the configured thresholds', () => {
+    expect(getMetricExplanation('adjusted', { fallback: 50, advance: 80 }))
+      .toMatchObject({
+        formula: 'N + (accuracy − fallback threshold) ÷ (advance threshold − fallback threshold)',
+        examples: ['50% → 2.00', '65% → 2.50', '80% → 3.00'],
+      })
+
+    expect(getMetricExplanation('adjusted', { fallback: 60, advance: 90 }).examples)
+      .toEqual(['60% → 2.00', '75% → 2.50', '90% → 3.00'])
   })
 })
 
@@ -136,6 +164,19 @@ describe('session normalization and game days', () => {
 })
 
 describe('statistics aggregation', () => {
+  it('keeps separate best threshold scores for Dual and Quad N-back', () => {
+    const scores = getBestThresholdScores([
+      session({ modeKey: 'quad-box:dual', variant: 'dual', nLevel: 2, accuracy: 0.8 }),
+      session({ modeKey: 'quad-box:dual', variant: 'dual', nLevel: 2, accuracy: 0.9 }),
+      session({ modeKey: 'quad-box:quad', variant: 'quad', nLevel: 3, accuracy: 0.5 }),
+      session({ modeKey: 'quad-box:quad', variant: 'quad', nLevel: 3, accuracy: 0.8 }),
+      session({ source: 'docct', modeKey: 'docct:2-back', variant: '2-back', nLevel: 2, accuracy: 1 }),
+    ])
+
+    expect(scores.dual).toBeCloseTo(3.3333333)
+    expect(scores.quad).toBe(4)
+  })
+
   it('keeps Dual and Quad N-back as separate progress modes', () => {
     const options = getProgressModeOptions([
       session({ modeKey: 'quad-box:dual', modeLabel: 'Dual', variant: 'dual' }),

@@ -96,7 +96,7 @@ describe('imported game persistence', () => {
     await expect(getAllCompletedGames()).resolves.toHaveLength(1)
   })
 
-  it('adds a Syllogimous session once and includes it in today’s training summary', async () => {
+  it('adds a Syllogimous session once without changing the N-back page summary', async () => {
     const session = syllogimousSession()
 
     await expect(addSyllogimousSession(session)).resolves.toBe(true)
@@ -125,8 +125,8 @@ describe('imported game persistence', () => {
       },
     })
     await expect(getTrainingSummarySince4AM()).resolves.toEqual({
-      playTime: 90,
-      sessionCount: 1,
+      playTime: 0,
+      sessionCount: 0,
     })
   })
 
@@ -141,11 +141,10 @@ describe('imported game persistence', () => {
     expect(stored[0].sessionId).toBe('quad-session')
   })
 
-  it('counts only completed sessions in the current training day', async () => {
+  it('counts only completed Quad Box N-back sessions in the current training day', async () => {
     const now = Date.now()
     await addImportedGames([
       game('completed-a', now),
-      game('completed-b', now),
       {
         ...game('completed-docct', now),
         source: 'docct',
@@ -153,16 +152,35 @@ describe('imported game persistence', () => {
         variant: '1-back',
         start: now - 30_000,
       },
-      { ...game('cancelled', now), status: 'cancelled' },
     ])
 
     await expect(getTrainingSummarySince4AM()).resolves.toEqual({
-      playTime: 80,
-      sessionCount: 3,
+      playTime: 25,
+      sessionCount: 1,
     })
 
     const yearlyMinutes = await getYearOfPlayTime()
-    expect(Object.values(yearlyMinutes).reduce((sum, minutes) => sum + minutes, 0)).toBeCloseTo(80 / 60)
+    expect(Object.values(yearlyMinutes).reduce((sum, minutes) => sum + minutes, 0)).toBeCloseTo(25 / 60)
+  })
+
+  it('does not count Quad Box tally activities as N-back page activity', async () => {
+    const now = Date.now()
+    await addImportedGames([{
+      ...game('completed-tally', now),
+      start: now - 45_000,
+      title: 'tally dual',
+      mode: 'tally',
+      variant: 'tally dual',
+      scores: { tally: { hits: 8, possible: 10 } },
+    }])
+
+    await expect(getTrainingSummarySince4AM()).resolves.toEqual({
+      playTime: 0,
+      sessionCount: 0,
+    })
+
+    const yearlyMinutes = await getYearOfPlayTime()
+    expect(Object.values(yearlyMinutes).reduce((sum, minutes) => sum + minutes, 0)).toBe(0)
   })
 
   it('can store, normalize, summarize, display, and export every generated accepted backup', async () => {
