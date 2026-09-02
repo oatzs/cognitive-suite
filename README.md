@@ -1,6 +1,6 @@
 # 🧠 Cognitive Suite
 
-Cognitive Suite combines Quad Box nback, DocCT, and Syllogimous relational reasoning training in one web app and desktop executable! These are mindbuilding exercises that can improve working memory, executive functioning, and fluid intelligence. Don't believe me? Check out some of the anecdotes on the mindbuilding and nback discord servers at https://discord.gg/brain and https://discord.gg/rxbrTVAgnH
+Cognitive Suite combines Quad Box nback, DocCT, and Syllogimous relational reasoning training in one web app and desktop executable! These are mindbuilding exercises that can improve working memory, executive functioning, and fluid intelligence. Don't believe me? Check out some of the anecdotes on the mindbuilding server https://discord.gg/brain 
 
 If you want to try it out online:
 
