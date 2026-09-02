@@ -18,16 +18,14 @@ describe('community Discord links', () => {
     target.remove()
   })
 
-  it('links both small Discord icons to their named communities', () => {
+  it('links the small Discord icon to its named community', () => {
     const links = [...target.querySelectorAll('a')]
-    expect(links).toHaveLength(2)
+    expect(links).toHaveLength(1)
     expect(links.map((link) => link.href)).toEqual([
       'https://discord.gg/brain',
-      'https://discord.gg/rxbrTVAgnH',
     ])
     expect(links.map((link) => link.getAttribute('aria-label'))).toEqual([
       'Mindbuilding Discord: discord.gg/brain',
-      'N-Back Discord: discord.gg/rxbrTVAgnH',
     ])
     expect(links.every((link) => link.target === '_blank' && link.querySelector('svg'))).toBe(true)
   })

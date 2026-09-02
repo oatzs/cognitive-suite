@@ -5,11 +5,6 @@
       displayUrl: 'discord.gg/brain',
       href: 'https://discord.gg/brain',
     },
-    {
-      label: 'N-Back Discord',
-      displayUrl: 'discord.gg/rxbrTVAgnH',
-      href: 'https://discord.gg/rxbrTVAgnH',
-    },
   ]
 </script>
 
