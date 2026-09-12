@@ -455,6 +455,9 @@ function generateQuestion() {
         savedata.enableDirection,
         savedata.enableDirection3D,
         savedata.enableDirection4D,
+        savedata.enableDirection5D,
+        savedata.enableDirection6D,
+        savedata.enableDirection7D,
         savedata.enableAnchorSpace
     ].reduce((a, c) => a + +c, 0) > 0;
 
@@ -464,6 +467,9 @@ function generateQuestion() {
         savedata.enableDirection,
         savedata.enableDirection3D,
         savedata.enableDirection4D,
+        savedata.enableDirection5D,
+        savedata.enableDirection6D,
+        savedata.enableDirection7D,
         savedata.enableSyllogism
     ].reduce((a, c) => a + +c, 0) > 1;
 
@@ -486,6 +492,7 @@ function generateQuestion() {
             generators.push(createDirection3DGenerator(quota));
         if (savedata.enableDirection4D)
             generators.push(createDirection4DGenerator(quota));
+        generators.push(...createHigherDimensionGenerators(quota));
         if (savedata.enableAnchorSpace)
             generators.push(createAnchorSpaceGenerator(quota));
     }

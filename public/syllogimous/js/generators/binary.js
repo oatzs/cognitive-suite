@@ -12,6 +12,7 @@ function createBinaryGeneratorPool(length) {
         generators.push(createDirection3DGenerator(length));
     if (savedata.enableDirection4D)
         generators.push(createDirection4DGenerator(length));
+    generators.push(...createHigherDimensionGenerators(length));
     return generators;
 }
 

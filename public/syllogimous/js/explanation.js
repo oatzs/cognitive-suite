@@ -137,6 +137,13 @@ function createExplanationBuckets(question) {
     return s;
 }
 
+function createExplanationND(wordCoordMap) {
+    const entries = Object.entries(wordCoordMap);
+    const headings = entries[0][1].map((_, i) => `<th scope="col">${dimensionNames[i]}</th>`).join('');
+    const rows = entries.map(([word, coord]) => `<tr><th scope="row">${word}</th>${coord.map(value => `<td>${value}</td>`).join('')}</tr>`).join('');
+    return `<div class="dimension-explanation"><div>Coordinates: +X East, +Y North, +Z Above, +T Future.<br>W/V/U: positive, negative, or same relative to the other object.</div><table class="dimension-coordinates"><thead><tr><th scope="col">Object</th>${headings}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
 function createExplanation(question) {
     if (question.bucket) {
         return createExplanationBucket(question);
@@ -147,6 +154,10 @@ function createExplanation(question) {
     }
 
     if (question.wordCoordMap) {
+        // A dense 7D grid grows exponentially; list only the occupied coordinates.
+        if (Object.values(question.wordCoordMap)[0].length > 4) {
+            return createExplanationND(question.wordCoordMap);
+        }
         const grid = createGridFromMap(question.wordCoordMap);
         if (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0])) {
             return createExplanation4D(grid);
@@ -211,4 +222,3 @@ function createExplanationButton(question) {
 
     return ''
 }
-

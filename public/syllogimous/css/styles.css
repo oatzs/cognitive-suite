@@ -477,6 +477,14 @@ input[type="number"]::-moz-inner-spin-button {
     margin-bottom: 2.5rem;
 }
 
+.higher-dimension-settings .multi-input {
+    flex-wrap: wrap;
+}
+
+.higher-dimension-settings .explainer {
+    max-height: none;
+}
+
 .single-input {
     display: flex;
     gap: 0.2rem;
@@ -1437,6 +1445,23 @@ table.distinction th {
     border-left: 1px solid var(--text-color);
     border-right: 1px solid var(--text-color);
     min-width: 1em;
+}
+
+.dimension-explanation {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+table.dimension-coordinates {
+    margin: 0.75rem auto;
+    border-collapse: collapse;
+    font-size: clamp(0.6rem, 2vw, 1rem);
+}
+
+table.dimension-coordinates th,
+table.dimension-coordinates td {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--text-color);
 }
 
 table.distinction {

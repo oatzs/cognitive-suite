@@ -47,6 +47,7 @@ class AnalogyQuestion {
             generators.push(createDirection3DGenerator(length));
         if (savedata.enableDirection4D)
             generators.push(createDirection4DGenerator(length));
+        generators.push(...createHigherDimensionGenerators(length));
         if (savedata.enableAnchorSpace)
             generators.push(createAnchorSpaceGenerator(length));
 
