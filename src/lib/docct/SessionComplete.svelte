@@ -6,6 +6,11 @@
     readDocctValue,
   } from './persistence.js';
   import { onMount, untrack } from 'svelte';
+  import {
+    chronologicalSessions,
+    formatSessionChartLabel,
+    formatSessionTooltipTime,
+  } from './chartTime';
 
   let { engine, onHistory }: { engine: Engine; onHistory?: () => void } = $props();
   let state = $state<GameState>(untrack(() => engine.getState()));
@@ -85,15 +90,27 @@
       const Chart = chartModule.default;
       const fontFamily = "'DM Sans', sans-serif";
       const fontConfig = { family: fontFamily, size: 12, weight: 500 };
+      const sessions = chronologicalSessions(state.history);
+      const chartLabels = sessions.map(s => formatSessionChartLabel(s.completedAt));
+      const tooltipTitle = (items: any[]) => items.length > 0
+        ? formatSessionTooltipTime(sessions[items[0].dataIndex].completedAt)
+        : '';
+      const timeAxis = {
+        display: true,
+        title: { display: true, text: 'Session completed', color: '#7e8baa', font: fontConfig },
+        ticks: { color: '#7e8baa', font: fontConfig, autoSkip: true, maxTicksLimit: 6, maxRotation: 0 },
+        grid: { display: false },
+        border: { display: false },
+      };
 
       // Accuracy chart
-      const accuracyData = state.history.slice().reverse().map((s, i) => ({ x: i, y: Math.round(s.accuracy * 100) }));
+      const accuracyData = sessions.map(s => Math.round(s.accuracy * 100));
       new Chart(accuracyCanvas, {
         type: 'line',
         data: {
-          labels: accuracyData.map(() => ''),
+          labels: chartLabels,
           datasets: [{
-            data: accuracyData.map(d => d.y),
+            data: accuracyData,
             borderColor: '#10b981',
             borderWidth: 3,
             pointRadius: 4,
@@ -113,12 +130,13 @@
             legend: { display: false },
             tooltip: {
               callbacks: {
+                title: tooltipTitle,
                 label: (ctx: any) => `Accuracy: ${ctx.parsed.y}%`
               }
             }
           },
           scales: {
-            x: { display: false },
+            x: timeAxis,
             y: {
               min: 0, max: 100,
               ticks: { color: '#7e8baa', font: fontConfig, stepSize: 25, callback: (v: any) => `${v}%` },
@@ -131,17 +149,17 @@
       });
 
       // Interval chart
-      const intervalData = state.history.slice().reverse().map((s, i) => ({ x: i, y: s.fastestIntervalMs / 1000 }));
-      const intervalMin = Math.min(...intervalData.map(d => d.y));
-      const intervalMax = Math.max(...intervalData.map(d => d.y));
+      const intervalData = sessions.map(s => s.fastestIntervalMs / 1000);
+      const intervalMin = Math.min(...intervalData);
+      const intervalMax = Math.max(...intervalData);
       const intervalPadding = Math.max(0.1, (intervalMax - intervalMin) * 0.1);
 
       new Chart(intervalCanvas, {
         type: 'line',
         data: {
-          labels: intervalData.map(() => ''),
+          labels: chartLabels,
           datasets: [{
-            data: intervalData.map(d => d.y),
+            data: intervalData,
             borderColor: '#d5b15e',
             borderWidth: 3,
             pointRadius: 4,
@@ -161,12 +179,13 @@
             legend: { display: false },
             tooltip: {
               callbacks: {
+                title: tooltipTitle,
                 label: (ctx: any) => `Fastest: ${ctx.parsed.y.toFixed(1)}s`
               }
             }
           },
           scales: {
-            x: { display: false },
+            x: timeAxis,
             y: {
               min: Math.max(0, intervalMin - intervalPadding),
               max: intervalMax + intervalPadding,
@@ -302,14 +321,16 @@
     <!-- Charts section -->
     <div class="grid grid-cols-1 gap-4 max-w-5xl w-full mt-4">
       <section class="rounded-[24px] bg-[#0f121a] p-5">
-        <span class="text-lg font-medium text-[#a9b4cc]">Accuracy</span>
+        <span class="text-lg font-medium text-[#a9b4cc]">Accuracy history</span>
+        <p class="mt-1 text-xs text-[#7e889c]">Each point is one session’s final average.</p>
         <div class="mt-4 h-[200px] min-w-0 sm:h-[220px] md:h-[240px] lg:h-[260px]">
           <canvas bind:this={accuracyCanvas}></canvas>
         </div>
       </section>
 
       <section class="rounded-[24px] bg-[#0f121a] p-5">
-        <span class="text-lg font-medium text-[#a9b4cc]">Fastest Interval</span>
+        <span class="text-lg font-medium text-[#a9b4cc]">Fastest interval history</span>
+        <p class="mt-1 text-xs text-[#7e889c]">Each point is one completed session.</p>
         <div class="mt-4 h-[200px] min-w-0 sm:h-[220px] md:h-[240px] lg:h-[260px]">
           <canvas bind:this={intervalCanvas}></canvas>
         </div>

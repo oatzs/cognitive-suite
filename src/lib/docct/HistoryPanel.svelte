@@ -1,6 +1,11 @@
 <script lang="ts">
   import type { Engine, GameState } from './engine';
   import { onDestroy, onMount, untrack } from 'svelte';
+  import {
+    chronologicalSessions,
+    formatSessionChartLabel,
+    formatSessionTooltipTime,
+  } from './chartTime';
 
   let { engine, close, restoreFocusTo }: { engine: Engine; close: () => void; restoreFocusTo: HTMLElement | null } = $props();
   let state = $state<GameState>(untrack(() => engine.getState()));
@@ -73,14 +78,25 @@
   function renderCharts() {
     if (!chartCanvas || !Chart) return;
 
-    const sessions = [...state.history].reverse();
+    const sessions = chronologicalSessions(state.history);
+    const chartLabels = sessions.map(s => formatSessionChartLabel(s.completedAt));
+    const tooltipTitle = (items: any[]) => items.length > 0
+      ? formatSessionTooltipTime(sessions[items[0].dataIndex].completedAt)
+      : '';
+    const timeAxis = {
+      display: true,
+      title: { display: true, text: 'Session completed', color: '#7e889c', font: { size: 10 } },
+      ticks: { color: '#7e889c', font: { size: 10 }, autoSkip: true, maxTicksLimit: 4, maxRotation: 0 },
+      grid: { display: false },
+      border: { display: false },
+    };
 
     // Accuracy chart
     accuracyChart?.destroy();
     accuracyChart = new Chart(chartCanvas, {
       type: 'line',
       data: {
-        labels: sessions.map(() => ''),
+        labels: chartLabels,
         datasets: [{
           data: sessions.map(s => Math.round(s.accuracy * 100)),
           borderColor: '#10b981',
@@ -94,9 +110,17 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: tooltipTitle,
+              label: (ctx: any) => `Accuracy: ${ctx.parsed.y}%`,
+            },
+          },
+        },
         scales: {
-          x: { display: false },
+          x: timeAxis,
           y: {
             min: 0,
             max: 100,
@@ -113,7 +137,7 @@
       intervalChart = new Chart(intervalChartCanvas, {
         type: 'line',
         data: {
-          labels: sessions.map(() => ''),
+          labels: chartLabels,
           datasets: [{
             data: sessions.map(s => s.fastestIntervalMs),
             borderColor: '#10b981',
@@ -127,9 +151,17 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: tooltipTitle,
+                label: (ctx: any) => `Fastest: ${formatTime(ctx.parsed.y)}`,
+              },
+            },
+          },
           scales: {
-            x: { display: false },
+            x: timeAxis,
             y: {
               ticks: { color: '#7e889c', font: { size: 10 } },
               grid: { color: '#121621' }
@@ -196,15 +228,17 @@
       <div class="flex flex-col">
       <!-- Charts -->
       <div class="order-2 mb-6 md:order-1">
-        <h3 class="text-[#a9b4cc] text-sm font-medium mb-3">Accuracy Trend</h3>
-        <div class="bg-[#121621] rounded-xl p-4 h-[160px]">
+        <h3 class="text-[#a9b4cc] text-sm font-medium">Accuracy history</h3>
+        <p class="mb-3 mt-1 text-xs text-[#7e889c]">Each point is one session’s final average.</p>
+        <div class="bg-[#121621] rounded-xl p-4 h-[210px]">
           <canvas bind:this={chartCanvas}></canvas>
         </div>
       </div>
 
       <div class="order-3 mb-6 md:order-2">
-        <h3 class="text-[#a9b4cc] text-sm font-medium mb-3">Fastest Interval Trend</h3>
-        <div class="bg-[#121621] rounded-xl p-4 h-[160px]">
+        <h3 class="text-[#a9b4cc] text-sm font-medium">Fastest interval history</h3>
+        <p class="mb-3 mt-1 text-xs text-[#7e889c]">Each point is one completed session.</p>
+        <div class="bg-[#121621] rounded-xl p-4 h-[210px]">
           <canvas bind:this={intervalChartCanvas}></canvas>
         </div>
       </div>
