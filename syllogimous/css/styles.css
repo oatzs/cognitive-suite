@@ -484,6 +484,11 @@ input[type="number"]::-moz-inner-spin-button {
     max-width: calc(100% - 1rem);
 }
 
+#sidebar-settings {
+    width: min(600px, 100vw);
+    max-width: 600px;
+}
+
 .higher-dimension-settings .explainer {
     max-height: none;
 }
@@ -2094,6 +2099,12 @@ table.distinction {
 
     svg.junk, svg.noise, svg.anchor {
         height: 1.25em;
+    }
+}
+
+@media (max-width: 350px) {
+    .higher-dimension-settings .multi-input {
+        grid-template-columns: max-content;
     }
 }
 
