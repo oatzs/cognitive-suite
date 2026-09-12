@@ -30,12 +30,12 @@
   let games = []
   let loading = true
   let loadError = ''
-  let source = 'all'
-  let mode = 'all'
+  let source = 'quad-box'
+  let mode = 'quad-box:quad'
   let range = 'all'
   let metric = 'adjusted'
-  let progressMode = null
-  let progressModeManuallySelected = false
+  let progressMode = 'quad-box:quad'
+  let progressModeManuallySelected = true
   let progressMetricSource = 'quad-box'
   let importInput
   let importing = false
@@ -67,9 +67,12 @@
 
   $: sessions = normalizeGames(games)
   $: sourceSessions = source === 'all' ? sessions : sessions.filter((session) => session.source === source)
-  $: modeOptions = [...new Map(sourceSessions.map((session) => [session.modeKey, session.modeLabel])).entries()]
+  $: modeOptions = [...new Map([
+    ...(source === 'quad-box' ? [['quad-box:quad', 'Quad']] : []),
+    ...sourceSessions.map((session) => [session.modeKey, session.modeLabel]),
+  ]).entries()]
     .sort((a, b) => a[1].localeCompare(b[1]))
-  $: if (mode !== 'all' && !modeOptions.some(([key]) => key === mode)) mode = 'all'
+  $: if (!loading && mode !== 'all' && !modeOptions.some(([key]) => key === mode)) mode = 'all'
   $: progressModeOptions = getProgressModeOptions(sourceSessions, source)
   $: if (!loading) {
     progressMode = resolveProgressMode(
