@@ -218,6 +218,57 @@ class Direction4D {
     }
 }
 
+// Higher dimensions retain X/Y/Z and time, then add independent W/V/U axes.
+class DirectionND extends Direction4D {
+    constructor(dimensions, enableHardMode=true) {
+        super(enableHardMode);
+        this.dimensions = dimensions;
+    }
+
+    pickDirection(baseWord, neighbors, wordCoordMap) {
+        const spatialMap = Object.fromEntries(Object.entries(wordCoordMap).map(([word, coord]) => [word, coord.slice(0, 4)]));
+        const coord = super.pickDirection(baseWord, neighbors, spatialMap);
+        return [...coord, ...Array.from({ length: this.dimensions - 4 }, () => Math.floor(Math.random() * 3) - 1)];
+    }
+
+    createDirectionStatement(a, b, dirCoord) {
+        const statement = super.createDirectionStatement(a, b, dirCoord);
+        const extraRelations = coord => coord.slice(4).map((value, i) => {
+            const axis = dimensionNames[i + 4];
+            return value === 0 ? `same ${axis}` : `${value > 0 ? 'positive' : 'negative'} ${axis}`;
+        }).join(', ');
+        statement.relation = statement.relation.replace(' of', ` (${extraRelations(dirCoord)}) of`);
+        statement.reverse = statement.reverse.replace(' of', ` (${extraRelations(inverse(dirCoord))}) of`);
+        return statement;
+    }
+
+    initialCoord() {
+        return Array(this.dimensions).fill(0);
+    }
+
+    getName() {
+        return `Space ${this.dimensions}D`;
+    }
+
+    hardModeLevel() {
+        return savedata[`space${this.dimensions}DHardModeLevel`];
+    }
+
+    getCountdown() {
+        return savedata[`overrideDirection${this.dimensions}DTime`];
+    }
+}
+
+function createHigherDimensionGenerators(length) {
+    return [5, 6, 7]
+        .filter(dimensions => savedata[`enableDirection${dimensions}D`])
+        .map(dimensions => ({
+            question: new DirectionQuestion(new DirectionND(dimensions)),
+            premiseCount: getPremisesFor(`overrideDirection${dimensions}DPremises`, length),
+            weight: savedata[`overrideDirection${dimensions}DWeight`],
+        }));
+}
+
 function pickBaseWord(neighbors, branchesAllowed, bannedFromBranching=[]) {
     if (savedata.enableConnectionBranching === false) {
         branchesAllowed = false;

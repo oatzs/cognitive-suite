@@ -6,6 +6,9 @@ const TYPE_TO_OVERRIDES = {
     "space-two-d"  : [ "overrideDirectionPremises"  , "overrideDirectionTime" ],
     "space-three-d": [ "overrideDirection3DPremises", "overrideDirection3DTime" ],
     "space-time"   : [ "overrideDirection4DPremises", "overrideDirection4DTime" ],
+    "space-5d"     : [ "overrideDirection5DPremises", "overrideDirection5DTime" ],
+    "space-6d"     : [ "overrideDirection6DPremises", "overrideDirection6DTime" ],
+    "space-7d"     : [ "overrideDirection7DPremises", "overrideDirection7DTime" ],
     "anchor-space" : [ "overrideAnchorSpacePremises", "overrideAnchorSpaceTime" ],
 };
 

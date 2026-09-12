@@ -30,6 +30,9 @@ let savedata = {
     "enableDirection": true,
     "enableDirection3D": false,
     "enableDirection4D": false,
+    "enableDirection5D": false,
+    "enableDirection6D": false,
+    "enableDirection7D": false,
     "enableAnchorSpace": false,
     "enableBinary": false,
     "useMeaningfulWords": false,
@@ -55,6 +58,9 @@ let savedata = {
     "overrideDirectionPremises": null,
     "overrideDirection3DPremises": null,
     "overrideDirection4DPremises": null,
+    "overrideDirection5DPremises": null,
+    "overrideDirection6DPremises": null,
+    "overrideDirection7DPremises": null,
     "overrideAnchorSpacePremises": null,
     "overrideDistinctionTime": null,
     "overrideLinearTime": null,
@@ -64,6 +70,9 @@ let savedata = {
     "overrideDirectionTime": null,
     "overrideDirection3DTime": null,
     "overrideDirection4DTime": null,
+    "overrideDirection5DTime": null,
+    "overrideDirection6DTime": null,
+    "overrideDirection7DTime": null,
     "overrideAnchorSpaceTime": null,
     "overrideDistinctionWeight": 150,
     "overrideLeftRightWeight": 100,
@@ -75,6 +84,9 @@ let savedata = {
     "overrideDirectionWeight": 100,
     "overrideDirection3DWeight": 100,
     "overrideDirection4DWeight": 100,
+    "overrideDirection5DWeight": 100,
+    "overrideDirection6DWeight": 100,
+    "overrideDirection7DWeight": 100,
     "overrideAnchorSpaceWeight": 100,
     "useJunkEmoji": false,
     "useVisualNoise": false,
@@ -82,6 +94,9 @@ let savedata = {
     "space2DHardModeLevel": 0,
     "space3DHardModeLevel": 0,
     "space4DHardModeLevel": 0,
+    "space5DHardModeLevel": 0,
+    "space6DHardModeLevel": 0,
+    "space7DHardModeLevel": 0,
     "scrambleFactor": 80,
     "enableConnectionBranching": true,
     "enableTransformSet": true,
@@ -116,6 +131,9 @@ const compressedSettings = {
     "enableDirection": "dir2D",
     "enableDirection3D": "dir3D",
     "enableDirection4D": "dir4D",
+    "enableDirection5D": "dir5D",
+    "enableDirection6D": "dir6D",
+    "enableDirection7D": "dir7D",
     "enableAnchorSpace": "anc",
     "enableBinary": "bin",
     "useMeaningfulWords": "words",
@@ -143,6 +161,9 @@ const compressedSettings = {
     "overrideDirectionPremises": "dir2DP",
     "overrideDirection3DPremises": "dir3DP",
     "overrideDirection4DPremises": "dir4DP",
+    "overrideDirection5DPremises": "dir5DP",
+    "overrideDirection6DPremises": "dir6DP",
+    "overrideDirection7DPremises": "dir7DP",
     "overrideAnchorSpacePremises": "ancP",
     "overrideDistinctionTime": "distT",
     "overrideComparisonTime": "compT",
@@ -153,6 +174,9 @@ const compressedSettings = {
     "overrideDirectionTime": "dir2DT",
     "overrideDirection3DTime": "dir3DT",
     "overrideDirection4DTime": "dir4DT",
+    "overrideDirection5DTime": "dir5DT",
+    "overrideDirection6DTime": "dir6DT",
+    "overrideDirection7DTime": "dir7DT",
     "overrideAnchorSpaceTime": "ancT",
     "overrideDistinctionWeight": "distW",
     "overrideLeftRightWeight": "lrW",
@@ -164,6 +188,9 @@ const compressedSettings = {
     "overrideDirectionWeight": "dir2DW",
     "overrideDirection3DWeight": "dir3DW",
     "overrideDirection4DWeight": "dir4DW",
+    "overrideDirection5DWeight": "dir5DW",
+    "overrideDirection6DWeight": "dir6DW",
+    "overrideDirection7DWeight": "dir7DW",
     "overrideAnchorSpaceWeight": "ancW",
     "useJunkEmoji": "junk",
     "useVisualNoise": "vnoise",
@@ -171,6 +198,9 @@ const compressedSettings = {
     "space2DHardModeLevel": "transform2D",
     "space3DHardModeLevel": "transform3D",
     "space4DHardModeLevel": "transform4D",
+    "space5DHardModeLevel": "transform5D",
+    "space6DHardModeLevel": "transform6D",
+    "space7DHardModeLevel": "transform7D",
     "scrambleFactor": "scrambleF",
     "enableConnectionBranching": "branch",
     "enableTransformSet": "tset",
@@ -284,6 +314,21 @@ const keySettingMap = {
     "p-67": "autoProgressionChange",
     "p-68": "autoProgressionTimeDrop",
     "p-69": "autoProgressionTimeBump",
+    "p-direction-5d": "enableDirection5D",
+    "p-direction-5d-premises": "overrideDirection5DPremises",
+    "p-direction-5d-time": "overrideDirection5DTime",
+    "p-direction-5d-weight": "overrideDirection5DWeight",
+    "p-direction-5d-transforms": "space5DHardModeLevel",
+    "p-direction-6d": "enableDirection6D",
+    "p-direction-6d-premises": "overrideDirection6DPremises",
+    "p-direction-6d-time": "overrideDirection6DTime",
+    "p-direction-6d-weight": "overrideDirection6DWeight",
+    "p-direction-6d-transforms": "space6DHardModeLevel",
+    "p-direction-7d": "enableDirection7D",
+    "p-direction-7d-premises": "overrideDirection7DPremises",
+    "p-direction-7d-time": "overrideDirection7DTime",
+    "p-direction-7d-weight": "overrideDirection7DWeight",
+    "p-direction-7d-transforms": "space7DHardModeLevel",
 };
 
 const legacySettings = [
@@ -4428,6 +4473,9 @@ const dirStringMinimal = (coord) => {
     str += fourDToArrow(coord);
     str += threeDToTriangle(coord);
     str += twoDToArrow(coord);
+    if (coord.length > 4) {
+        str += ' ' + coord.slice(4).map((value, i) => `${dimensionNames[i + 4]}${value > 0 ? '+' : value < 0 ? '−' : '='}`).join(' ');
+    }
     return str;
 }
 
@@ -4475,5 +4523,8 @@ const dimensionNames = {
     [0]: 'X',
     [1]: 'Y',
     [2]: 'Z',
-    [3]: 'T'
+    [3]: 'T',
+    [4]: 'W',
+    [5]: 'V',
+    [6]: 'U'
 }

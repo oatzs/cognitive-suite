@@ -5,7 +5,7 @@ class IncorrectDirections {
         let permutate = (i) => {
             if (i >= permutation.length) {
                 if (!arraysEqual(permutation, correctCoord) && 
-                    !arraysEqual(permutation, correctCoord.slice(0, 3).map(d => 0)) &&
+                    permutation.slice(0, 3).some(d => d !== 0) &&
                     combinations.findIndex(combo => arraysEqual(permutation, combo)) === -1) {
                     unused.push(permutation.slice());
                 }
