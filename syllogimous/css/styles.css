@@ -478,7 +478,10 @@ input[type="number"]::-moz-inner-spin-button {
 }
 
 .higher-dimension-settings .multi-input {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
+    width: max-content;
+    max-width: calc(100% - 1rem);
 }
 
 .higher-dimension-settings .explainer {
