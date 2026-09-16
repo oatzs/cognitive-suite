@@ -18,7 +18,9 @@ beforeEach(() => {
   for (const script of dom.window.document.querySelectorAll('script[src]')) {
     const path = script.getAttribute('src')
     if (!path.startsWith('js/lib/')) {
-      runInContext(readFileSync(new URL(path, root), 'utf8'), context, { filename: path, timeout: 10000 })
+      const scriptUrl = new URL(path, root)
+      scriptUrl.search = ''
+      runInContext(readFileSync(scriptUrl, 'utf8'), context, { filename: path, timeout: 10000 })
     }
   }
 })
