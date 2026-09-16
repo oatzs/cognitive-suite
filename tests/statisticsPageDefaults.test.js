@@ -30,7 +30,7 @@ describe('Statistics page defaults', () => {
     vi.restoreAllMocks()
   })
 
-  it('opens on Quad Box, Quad, All time, and Quad N-back even before a Quad session', async () => {
+  it('opens on Quad Box, Quad, All time, Quad N-back, and average percentage', async () => {
     target = document.createElement('div')
     document.body.append(target)
     component = mount(StatisticsPage, { target })
@@ -47,5 +47,6 @@ describe('Statistics page defaults', () => {
     const selectedProgressMode = target.querySelector('[aria-label="Progress mode"] [aria-pressed="true"]')
     expect(selectedProgressMode?.textContent).toBe('Quad N-back')
     expect(target.textContent).toContain('Quad N-back sessions only.')
+    expect(target.querySelector('[data-measure-trigger]')?.textContent).toContain('Average percentage')
   })
 })

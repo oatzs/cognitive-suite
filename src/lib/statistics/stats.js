@@ -6,7 +6,7 @@ export const METRICS = {
   sessions: { label: 'Sessions per day', shortLabel: 'Sessions', unit: 'count', precision: 0 },
   adjusted: { label: 'Threshold score', shortLabel: 'Score', unit: 'score', precision: 2 },
   n: { label: 'N level', shortLabel: 'N', unit: 'score', precision: 2 },
-  accuracy: { label: 'Accuracy', shortLabel: 'Accuracy', unit: 'percent', precision: 0 },
+  accuracy: { label: 'Average percentage', shortLabel: 'Percentage', unit: 'percent', precision: 1 },
   nAccuracy: { label: 'N + accuracy', shortLabel: 'N + accuracy', unit: 'score', precision: 2 },
   weightedAccuracy: { label: 'Weighted N + accuracy', shortLabel: 'Weighted score', unit: 'score', precision: 2 },
   fastestInterval: { label: 'Fastest interval', shortLabel: 'Fastest', unit: 'seconds', precision: 2, lowerIsBetter: true },
@@ -25,7 +25,8 @@ const metricExplanations = {
     examples: ['A 2-back session → 2.00'],
   },
   accuracy: {
-    summary: 'Shows the percentage of scored answers that were correct.',
+    summary: 'Shows the overall percentage earned in each session.',
+    detail: 'The daily average is the average of the overall percentages from that day\'s sessions.',
     formula: 'correct answers ÷ possible answers × 100',
     examplesLabel: 'Example:',
     examples: ['8 correct out of 10 → 80%'],

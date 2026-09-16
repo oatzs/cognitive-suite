@@ -278,6 +278,17 @@ describe('statistics aggregation', () => {
     ])
   })
 
+  it('averages each N-back session percentage for the daily percentage measure', () => {
+    const points = groupDaily([
+      session({ accuracy: 0.683 }),
+      session({ accuracy: 0.857 }),
+    ], 'accuracy')
+
+    expect(points).toEqual([
+      { day: '2026-01-05', average: 77, best: 85.7, count: 2 },
+    ])
+  })
+
   it('counts completed sessions per training day', () => {
     const points = groupDaily([
       session(),

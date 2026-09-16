@@ -33,7 +33,7 @@
   let source = 'quad-box'
   let mode = 'quad-box:quad'
   let range = 'all'
-  let metric = 'adjusted'
+  let metric = 'accuracy'
   let progressMode = 'quad-box:quad'
   let progressModeManuallySelected = true
   let progressMetricSource = 'quad-box'
@@ -41,7 +41,7 @@
   let importing = false
   let transferNotice = null
 
-  const nbackMetrics = ['sessions', 'adjusted', 'n', 'accuracy', 'nAccuracy', 'weightedAccuracy']
+  const nbackMetrics = ['accuracy', 'sessions', 'adjusted', 'n', 'nAccuracy', 'weightedAccuracy']
   const docctMetrics = [...nbackMetrics, 'fastestInterval', 'responseTime']
   const syllogimousMetrics = ['sessions', 'accuracy', 'responseTime']
   const metricsForSource = (trainer) => trainer === 'docct'
@@ -49,7 +49,7 @@
     : trainer === 'syllogimous'
       ? syllogimousMetrics
       : nbackMetrics
-  const defaultMetricForSource = (trainer) => trainer === 'quad-box' ? 'adjusted' : 'accuracy'
+  const defaultMetricForSource = () => 'accuracy'
 
   async function load() {
     loading = true
