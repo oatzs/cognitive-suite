@@ -5,8 +5,9 @@ export const DEFAULT_THRESHOLDS = { advance: 80, fallback: 50 }
 export const METRICS = {
   sessions: { label: 'Sessions per day', shortLabel: 'Sessions', unit: 'count', precision: 0 },
   adjusted: { label: 'Threshold score', shortLabel: 'Score', unit: 'score', precision: 2 },
+  brainWorkshop: { label: 'Brain Workshop', shortLabel: 'BW score', unit: 'score', precision: 2 },
   n: { label: 'N level', shortLabel: 'N', unit: 'score', precision: 2 },
-  accuracy: { label: 'Average percentage', shortLabel: 'Percentage', unit: 'percent', precision: 1 },
+  accuracy: { label: 'Accuracy', shortLabel: 'Accuracy', unit: 'percent', precision: 0 },
   nAccuracy: { label: 'N + accuracy', shortLabel: 'N + accuracy', unit: 'score', precision: 2 },
   weightedAccuracy: { label: 'Weighted N + accuracy', shortLabel: 'Weighted score', unit: 'score', precision: 2 },
   fastestInterval: { label: 'Fastest interval', shortLabel: 'Fastest', unit: 'seconds', precision: 2, lowerIsBetter: true },
@@ -25,8 +26,7 @@ const metricExplanations = {
     examples: ['A 2-back session → 2.00'],
   },
   accuracy: {
-    summary: 'Shows the overall percentage earned in each session.',
-    detail: 'The daily average is the average of the overall percentages from that day\'s sessions.',
+    summary: 'Shows the percentage of scored answers that were correct.',
     formula: 'correct answers ÷ possible answers × 100',
     examplesLabel: 'Example:',
     examples: ['8 correct out of 10 → 80%'],
@@ -58,25 +58,35 @@ const formatExplanationPercent = (value) => Number.isInteger(value)
   : `${value.toFixed(1).replace(/\.0$/, '')}%`
 
 export function getMetricExplanation(metric, thresholds = DEFAULT_THRESHOLDS) {
-  if (metric !== 'adjusted') return metricExplanations[metric] ?? { summary: 'Shows this measure for each training day.' }
+  if (metric !== 'adjusted' && metric !== 'brainWorkshop') {
+    return metricExplanations[metric] ?? { summary: 'Shows this measure for each training day.' }
+  }
 
   const fallback = Number(thresholds.fallback)
   const advance = Number(thresholds.advance)
   const validThresholds = Number.isFinite(fallback) && Number.isFinite(advance) && advance !== fallback
+  const isBrainWorkshop = metric === 'brainWorkshop'
+  const percentageName = isBrainWorkshop ? 'average modality percentage' : 'overall accuracy'
+  const summary = isBrainWorkshop
+    ? 'Combines N level and average modality percentage using Brain Workshop\'s graph formula.'
+    : 'Converts overall accuracy into an N-level-equivalent score using the fallback and advance thresholds.'
+  const formula = `N + (${percentageName} − fallback threshold) ÷ (advance threshold − fallback threshold)`
   if (!validThresholds) {
     return {
-      summary: 'Converts accuracy into an N-level-equivalent score using the fallback and advance thresholds.',
+      summary,
       detail: 'The fallback and advance thresholds must be different before this score can be calculated.',
-      formula: 'N + (accuracy − fallback threshold) ÷ (advance threshold − fallback threshold)',
+      formula,
       examples: [],
     }
   }
 
   const midpoint = (fallback + advance) / 2
   return {
-    summary: 'Converts accuracy into an N-level-equivalent score using the fallback and advance thresholds.',
-    detail: 'At the fallback threshold the score equals N; at the advance threshold it equals N + 1.',
-    formula: 'N + (accuracy − fallback threshold) ÷ (advance threshold − fallback threshold)',
+    summary,
+    detail: isBrainWorkshop
+      ? 'At the fallback threshold the score equals N; at the advance threshold it equals N + 1. Genuine 0% modality scores remain included.'
+      : 'At the fallback threshold the score equals N; at the advance threshold it equals N + 1.',
+    formula,
     examplesLabel: `At 2-back with ${formatExplanationPercent(fallback)}/${formatExplanationPercent(advance)} thresholds:`,
     examples: [
       `${formatExplanationPercent(fallback)} → 2.00`,
@@ -235,6 +245,16 @@ export function metricValue(session, metric, thresholds = DEFAULT_THRESHOLDS) {
     case 'adjusted': {
       if (!Number.isFinite(n) || thresholds.advance === thresholds.fallback) return null
       return n + ((accuracy * 100) - thresholds.fallback) / (thresholds.advance - thresholds.fallback)
+    }
+    case 'brainWorkshop': {
+      if (!Number.isFinite(n) || thresholds.advance === thresholds.fallback) return null
+      const modalityAccuracies = session.modalities
+        .filter((modality) => modality.possible > 0 && Number.isFinite(modality.accuracy))
+        .map((modality) => modality.accuracy)
+      const averageModalityAccuracy = modalityAccuracies.length
+        ? modalityAccuracies.reduce((sum, value) => sum + value, 0) / modalityAccuracies.length
+        : accuracy
+      return n + ((averageModalityAccuracy * 100) - thresholds.fallback) / (thresholds.advance - thresholds.fallback)
     }
     case 'n':
       return Number.isFinite(n) ? n : null

@@ -34,11 +34,25 @@ const session = (overrides = {}) => ({
   ...overrides,
 })
 
-describe('Brain Workshop score metrics', () => {
-  it('maps fallback to N and advance to N+1', () => {
+describe('N-aware score metrics', () => {
+  it('maps fallback to N and advance to N+1 for threshold score', () => {
     expect(metricValue(session({ accuracy: 0.5 }), 'adjusted')).toBe(2)
     expect(metricValue(session({ accuracy: 0.8 }), 'adjusted')).toBe(3)
     expect(metricValue(session({ accuracy: 1 }), 'adjusted')).toBeCloseTo(3.6666667)
+  })
+
+  it('uses the mean modality percentage and preserves genuine zero-percent results', () => {
+    const value = session({
+      nLevel: 2,
+      accuracy: 0.9,
+      modalities: [
+        { key: 'position', possible: 10, accuracy: 1 },
+        { key: 'audio', possible: 10, accuracy: 0 },
+      ],
+    })
+
+    expect(metricValue(value, 'adjusted')).toBeCloseTo(3.3333333)
+    expect(metricValue(value, 'brainWorkshop')).toBe(2)
   })
 
   it('implements the remaining four formulas', () => {
@@ -53,6 +67,7 @@ describe('Brain Workshop score metrics', () => {
     for (const key of [
       'sessions',
       'adjusted',
+      'brainWorkshop',
       'n',
       'accuracy',
       'nAccuracy',
@@ -67,12 +82,20 @@ describe('Brain Workshop score metrics', () => {
   it('builds threshold-score examples from the configured thresholds', () => {
     expect(getMetricExplanation('adjusted', { fallback: 50, advance: 80 }))
       .toMatchObject({
-        formula: 'N + (accuracy − fallback threshold) ÷ (advance threshold − fallback threshold)',
+        formula: 'N + (overall accuracy − fallback threshold) ÷ (advance threshold − fallback threshold)',
         examples: ['50% → 2.00', '65% → 2.50', '80% → 3.00'],
       })
 
     expect(getMetricExplanation('adjusted', { fallback: 60, advance: 90 }).examples)
       .toEqual(['60% → 2.00', '75% → 2.50', '90% → 3.00'])
+  })
+
+  it('explains Brain Workshop using average modality percentage', () => {
+    expect(getMetricExplanation('brainWorkshop', { fallback: 50, advance: 80 }))
+      .toMatchObject({
+        formula: 'N + (average modality percentage − fallback threshold) ÷ (advance threshold − fallback threshold)',
+        examples: ['50% → 2.00', '65% → 2.50', '80% → 3.00'],
+      })
   })
 })
 
@@ -275,17 +298,6 @@ describe('statistics aggregation', () => {
     expect(points).toEqual([
       { day: '2026-01-05', average: 70, best: 90, count: 2 },
       { day: '2026-01-06', average: 70, best: 70, count: 1 },
-    ])
-  })
-
-  it('averages each N-back session percentage for the daily percentage measure', () => {
-    const points = groupDaily([
-      session({ accuracy: 0.683 }),
-      session({ accuracy: 0.857 }),
-    ], 'accuracy')
-
-    expect(points).toEqual([
-      { day: '2026-01-05', average: 77, best: 85.7, count: 2 },
     ])
   })
 

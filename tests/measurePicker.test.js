@@ -22,7 +22,7 @@ describe('statistics measure picker', () => {
     component = mount(MeasurePicker, {
       target,
       props: {
-        options: ['adjusted', 'nAccuracy'],
+        options: ['adjusted', 'brainWorkshop', 'nAccuracy'],
         value: 'adjusted',
         thresholds: { fallback: 50, advance: 80 },
         onChange,
@@ -33,11 +33,16 @@ describe('statistics measure picker', () => {
     await tick()
 
     const details = target.querySelector('[data-measure-details]')
-    expect(details.textContent).toContain('N + (accuracy − fallback threshold)')
+    expect(details.textContent).toContain('N + (overall accuracy − fallback threshold)')
     expect(details.textContent).toContain('At 2-back with 50%/80% thresholds:')
     expect(details.textContent).toContain('50% → 2.00')
     expect(details.textContent).toContain('65% → 2.50')
     expect(details.textContent).toContain('80% → 3.00')
+
+    const brainWorkshop = target.querySelector('[data-measure-option="brainWorkshop"]')
+    brainWorkshop.dispatchEvent(new MouseEvent('mouseenter'))
+    await tick()
+    expect(details.textContent).toContain('N + (average modality percentage − fallback threshold)')
 
     const nAccuracy = target.querySelector('[data-measure-option="nAccuracy"]')
     nAccuracy.dispatchEvent(new MouseEvent('mouseenter'))

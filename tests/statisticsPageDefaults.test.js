@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { mount, unmount } from 'svelte'
+import { mount, tick, unmount } from 'svelte'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../src/lib/gamedb', () => ({
@@ -30,7 +30,7 @@ describe('Statistics page defaults', () => {
     vi.restoreAllMocks()
   })
 
-  it('opens on Quad Box, Quad, All time, Quad N-back, and average percentage', async () => {
+  it('opens on Quad Box, Quad, All time, Quad N-back, and threshold score', async () => {
     target = document.createElement('div')
     document.body.append(target)
     component = mount(StatisticsPage, { target })
@@ -47,6 +47,12 @@ describe('Statistics page defaults', () => {
     const selectedProgressMode = target.querySelector('[aria-label="Progress mode"] [aria-pressed="true"]')
     expect(selectedProgressMode?.textContent).toBe('Quad N-back')
     expect(target.textContent).toContain('Quad N-back sessions only.')
-    expect(target.querySelector('[data-measure-trigger]')?.textContent).toContain('Average percentage')
+    const measureTrigger = target.querySelector('[data-measure-trigger]')
+    expect(measureTrigger?.textContent).toContain('Threshold score')
+
+    measureTrigger.click()
+    await tick()
+    expect(target.querySelector('[data-measure-option="brainWorkshop"]')?.textContent).toContain('Brain Workshop')
+    expect(target.querySelector('[data-measure-option="accuracy"]')).toBeNull()
   })
 })
