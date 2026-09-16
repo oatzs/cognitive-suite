@@ -40,6 +40,15 @@ function readRelation(question) {
 }
 
 describe('RRT dimensions through 7D', () => {
+  it('defaults new profiles to Voronoi emoji with no premise scrambling', () => {
+    expect(evaluate('defaultSavedata.useJunkEmoji')).toBe(true)
+    expect(evaluate('defaultSavedata.scrambleFactor')).toBe(0)
+    expect(evaluate('savedata.useJunkEmoji')).toBe(true)
+    expect(evaluate('savedata.scrambleFactor')).toBe(0)
+    expect(dom.window.document.getElementById('p-28').checked).toBe(true)
+    expect(dom.window.document.getElementById('p-31').value).toBe('0')
+  })
+
   it.each([5, 6, 7])('selects %iD alone, generates questions, and reloads its profile', dimensions => {
     evaluate(`Object.keys(savedata).filter(key => key.startsWith('enable')).forEach(key => savedata[key] = false); populateSettings();`)
     const checkbox = dom.window.document.getElementById(`p-direction-${dimensions}d`)
