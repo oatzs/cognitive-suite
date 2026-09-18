@@ -3,6 +3,7 @@ import {
   chooseInitialProgressMode,
   filterSessions,
   getBestThresholdScores,
+  getLifetimeTotals,
   getMetricExplanation,
   getProgressModeOptions,
   getModalityRollups,
@@ -353,6 +354,23 @@ describe('statistics aggregation', () => {
     expect(result.todaySessions).toBe(2)
     expect(result.rollingDurationSec).toBe(180)
     expect(result.averageAccuracy).toBeCloseTo(0.7)
+  })
+
+  it('calculates lifetime trainer totals independently of filters and uses response-only RRT time', () => {
+    const totals = getLifetimeTotals([
+      session({ source: 'docct', modeKey: 'docct:1-back', durationSec: 180 }),
+      session({ source: 'syllogimous', modeKey: 'syllogimous:mixed', durationSec: 999, responseTimeMs: 1500, possible: 4 }),
+      session({ modeKey: 'quad-box:quad', durationSec: 120 }),
+      session({ modeKey: 'quad-box:dual', durationSec: 60 }),
+      session({ modeKey: 'quad-box:custom', durationSec: 300 }),
+    ])
+
+    expect(totals).toEqual({
+      docct: { sessions: 1, durationSec: 180 },
+      rrt: { sessions: 1, durationSec: 6 },
+      quad: { sessions: 1, durationSec: 120 },
+      dual: { sessions: 1, durationSec: 60 },
+    })
   })
 
   it('rolls up the latest 50 modality results', () => {

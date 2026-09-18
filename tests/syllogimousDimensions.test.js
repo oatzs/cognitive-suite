@@ -42,6 +42,25 @@ function readRelation(question) {
 }
 
 describe('RRT dimensions through 7D', () => {
+  it('sums only answer response times into the visible session time and clears it with the session', () => {
+    evaluate(`
+      appState.questions = [
+        {startedAt: 1000, answeredAt: 31500, correctness: 'right'},
+        {startedAt: 40000, answeredAt: 72600, correctness: 'wrong'},
+        {startedAt: 80000, correctness: 'missed'},
+      ];
+      updateAverage(appState.questions);
+    `)
+
+    expect(dom.window.document.querySelector('.session-time').textContent).toBe('1m 3s')
+    expect(dom.window.document.getElementById('total-display').textContent).toBe('1m 3s')
+
+    dom.window.confirm = () => true
+    evaluate('clearHistory()')
+    expect(dom.window.document.querySelector('.session-time').textContent).toBe('0m 0s')
+    expect(dom.window.document.getElementById('total-display').textContent).toBe('0m 0s')
+  })
+
   it('defaults new profiles to Voronoi emoji with no premise scrambling', () => {
     expect(evaluate('defaultSavedata.useJunkEmoji')).toBe(true)
     expect(evaluate('defaultSavedata.scrambleFactor')).toBe(0)

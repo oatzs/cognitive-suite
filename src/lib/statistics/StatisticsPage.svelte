@@ -17,6 +17,7 @@
     filterSessions,
     formatMetric,
     getBestThresholdScores,
+    getLifetimeTotals,
     getModalityRollups,
     getProgressModeOptions,
     groupDaily,
@@ -50,6 +51,18 @@
       ? syllogimousMetrics
       : nbackMetrics
   const defaultMetricForSource = (trainer) => trainer === 'syllogimous' ? 'accuracy' : 'adjusted'
+  const lifetimeCardDefinitions = {
+    docct: { key: 'docct', label: 'DocCT' },
+    rrt: { key: 'rrt', label: 'RRT' },
+    quad: { key: 'quad', label: 'Quad N-back' },
+    dual: { key: 'dual', label: 'Dual N-back' },
+  }
+  const lifetimeKeysForSource = {
+    all: ['docct', 'rrt', 'quad', 'dual'],
+    'quad-box': ['quad', 'dual'],
+    docct: ['docct'],
+    syllogimous: ['rrt'],
+  }
 
   async function load() {
     loading = true
@@ -97,6 +110,11 @@
   $: progressSessions = filterSessions(sessions, { mode: progressMode, range })
   $: activitySessions = filterSessions(sessions, { source, mode, range: 'all' })
   $: summary = summarizeSessions(filtered)
+  $: lifetimeTotals = getLifetimeTotals(sessions)
+  $: lifetimeCards = lifetimeKeysForSource[source].map((key) => ({
+    ...lifetimeCardDefinitions[key],
+    ...lifetimeTotals[key],
+  }))
   $: daily = groupDaily(progressSessions, metric, thresholds)
   $: rollups = getModalityRollups(filtered)
   $: recent = filtered.slice(0, 20)
@@ -322,11 +340,27 @@
       </section>
 
       <section class="border-b border-base-300 py-5">
-        <div class="mb-3 flex items-center justify-between gap-4">
-          <h2 class="text-sm font-semibold">Training activity</h2>
-          <span class="text-xs opacity-55">Last 12 months</span>
+        <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
+          <div class="min-w-0">
+            <div class="mb-3 flex items-center justify-between gap-4">
+              <h2 class="text-sm font-semibold">Training activity</h2>
+              <span class="text-xs opacity-55">Last 12 months</span>
+            </div>
+            <ActivityHeatmap sessions={activitySessions} />
+          </div>
+          <aside class="border-t border-base-300 pt-4 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0" aria-label="Lifetime totals">
+            <h2 class="mb-3 text-sm font-semibold">Lifetime totals</h2>
+            <div class="grid gap-2 {lifetimeCards.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}">
+              {#each lifetimeCards as card (card.key)}
+                <div class="lifetime-card min-w-0 rounded-md border border-base-300 bg-base-200/50 px-3 py-2.5" data-lifetime-card={card.key}>
+                  <span class="block truncate text-[0.7rem] opacity-60">{card.label}</span>
+                  <strong class="my-0.5 block text-sm font-semibold">{formatSeconds(card.durationSec)}</strong>
+                  <small class="block text-[0.68rem] opacity-55">{card.sessions} session{card.sessions === 1 ? '' : 's'}</small>
+                </div>
+              {/each}
+            </div>
+          </aside>
         </div>
-        <ActivityHeatmap sessions={activitySessions} />
       </section>
 
       <section class="border-b border-base-300 py-5">

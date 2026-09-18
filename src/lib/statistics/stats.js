@@ -376,6 +376,42 @@ export function summarizeSessions(sessions, now = Date.now()) {
   }
 }
 
+const emptyLifetimeTotal = () => ({ sessions: 0, durationSec: 0 })
+
+export function getLifetimeTotals(sessions) {
+  const totals = {
+    docct: emptyLifetimeTotal(),
+    rrt: emptyLifetimeTotal(),
+    quad: emptyLifetimeTotal(),
+    dual: emptyLifetimeTotal(),
+  }
+
+  for (const session of sessions) {
+    const key = session.source === 'docct'
+      ? 'docct'
+      : session.source === 'syllogimous'
+        ? 'rrt'
+        : session.modeKey === 'quad-box:quad'
+          ? 'quad'
+          : session.modeKey === 'quad-box:dual'
+            ? 'dual'
+            : null
+    if (!key) continue
+
+    const responseOnlyDuration = Number.isFinite(session.responseTimeMs) && session.possible > 0
+      ? session.responseTimeMs * session.possible / 1000
+      : 0
+    const durationSec = session.source === 'syllogimous'
+      ? responseOnlyDuration
+      : Math.max(0, Number(session.durationSec) || 0)
+
+    totals[key].sessions++
+    totals[key].durationSec += durationSec
+  }
+
+  return totals
+}
+
 export function getModalityRollups(sessions, limit = 50) {
   const grouped = new Map()
   for (const session of sessions.slice(0, limit)) {

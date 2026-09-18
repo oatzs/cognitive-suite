@@ -27,7 +27,7 @@ describe('Statistics page defaults', () => {
   afterEach(async () => {
     if (component) await unmount(component)
     target?.remove()
-    vi.restoreAllMocks()
+    vi.clearAllMocks()
   })
 
   it('opens on Quad Box, Quad, All time, Quad N-back, and threshold score', async () => {
@@ -54,5 +54,30 @@ describe('Statistics page defaults', () => {
     await tick()
     expect(target.querySelector('[data-measure-option="brainWorkshop"]')?.textContent).toContain('Brain Workshop')
     expect(target.querySelector('[data-measure-option="accuracy"]')).toBeNull()
+  })
+
+  it('shows trainer-specific lifetime cards and all four cards for all trainers', async () => {
+    target = document.createElement('div')
+    document.body.append(target)
+    component = mount(StatisticsPage, { target })
+
+    await vi.waitFor(() => expect(target.querySelector('[aria-label="Lifetime totals"]')).not.toBeNull())
+
+    const lifetime = () => target.querySelector('[aria-label="Lifetime totals"]')
+    expect(lifetime().textContent).toContain('Quad N-back')
+    expect(lifetime().textContent).toContain('Dual N-back')
+    expect(lifetime().textContent).not.toContain('DocCT')
+    expect(lifetime().querySelectorAll('[data-lifetime-card]')).toHaveLength(2)
+
+    const trainer = target.querySelector('.stats-control select')
+    trainer.value = 'all'
+    trainer.dispatchEvent(new Event('change', { bubbles: true }))
+    await tick()
+
+    expect(lifetime().textContent).toContain('DocCT')
+    expect(lifetime().textContent).toContain('RRT')
+    expect(lifetime().textContent).toContain('Quad N-back')
+    expect(lifetime().textContent).toContain('Dual N-back')
+    expect(lifetime().querySelectorAll('[data-lifetime-card]')).toHaveLength(4)
   })
 })
