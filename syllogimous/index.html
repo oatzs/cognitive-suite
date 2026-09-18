@@ -17,7 +17,7 @@
 		<meta name="theme-color" content="#2bdef9" />
 
 		<link rel="icon" type="image/png" href="favicon.png">
-		<link rel="stylesheet" href="css/styles.css?v=20260918-session-time">
+		<link rel="stylesheet" href="css/styles.css?v=20260918-next">
 		<style id="live-styles"></style>
 	</head>
 	<body>
@@ -1125,10 +1125,11 @@
 					</div>
 				</div>
 
-				<div class="confirmation-buttons">
-					<button id="true-button" class="confirmation-true" onclick="checkIfTrue()" tabindex="-1">TRUE</button>
-					<button id="false-button" class="confirmation-false" onclick="checkIfFalse()" tabindex="-1">FALSE</button>
-				</div>
+					<div class="confirmation-buttons">
+						<button id="true-button" class="confirmation-true" onclick="checkIfTrue()" tabindex="-1">TRUE</button>
+						<button id="false-button" class="confirmation-false" onclick="checkIfFalse()" tabindex="-1">FALSE</button>
+						<button id="next-question-button" class="confirmation-next" onclick="goNext()" tabindex="-1" hidden>NEXT</button>
+					</div>
 
 				<div class="level-wrapper">
 					<div class="level">
@@ -2234,7 +2235,7 @@
 		<script src="js/progress.js"></script>
 		<script src="js/error-handling.js"></script>
 		<script src="js/sidebar-events.js"></script>
-		<script src="js/index.js?v=20260918-session-time"></script>
+		<script src="js/index.js?v=20260918-next"></script>
 		<script src="js/cognitive-suite-bridge.js"></script>
 	</body>
 </html>
