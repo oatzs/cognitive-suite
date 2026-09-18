@@ -3,6 +3,7 @@ const feedbackMissed = document.querySelector(".feedback--missed");
 const feedbackRight = document.querySelector(".feedback--right");
 const trueButton = document.getElementById("true-button");
 const falseButton = document.getElementById("false-button");
+const nextQuestionButton = document.getElementById("next-question-button");
 
 const correctlyAnsweredEl = document.querySelector(".correctly-answered");
 const nextLevelEl = document.querySelector(".next-level");
@@ -20,6 +21,7 @@ let timerCount = 30;
 let timerInstance;
 let timerRunning = false;
 let processingAnswer = false;
+let awaitingNext = false;
 
 const historyList = document.getElementById("history-list");
 const historyButton = document.querySelector(`label.open[for="offcanvas-history"]`);
@@ -343,6 +345,21 @@ function disableConfirmationButtons() {
     confirmationButtons.style.opacity = 0;
 }
 
+function showAnswerButtons() {
+    awaitingNext = false;
+    trueButton.hidden = false;
+    falseButton.hidden = false;
+    nextQuestionButton.hidden = true;
+}
+
+function showNextButton() {
+    awaitingNext = true;
+    trueButton.hidden = true;
+    falseButton.hidden = true;
+    nextQuestionButton.hidden = false;
+    enableConfirmationButtons();
+}
+
 function renderCarousel() {
     if (!savedata.enableCarouselMode) {
         display.classList.add("visible");
@@ -550,6 +567,9 @@ function generateQuestion() {
 }
 
 function init() {
+    if (awaitingNext) {
+        return;
+    }
     stopCountDown();
     question = generateQuestion();
     if (!question) {
@@ -567,6 +587,15 @@ function init() {
     displayInit();
     PROGRESS_STORE.renderCurrentProgress(question);
     renderConclusionSpoiler();
+}
+
+function goNext() {
+    if (!awaitingNext) {
+        return;
+    }
+    processingAnswer = false;
+    showAnswerButtons();
+    init();
 }
 
 function renderConclusionSpoiler() {
@@ -664,11 +693,11 @@ function wowFeedbackMissed(cb) {
 
 function wowFeedback() {
     if (question.correctness === 'right') {
-        wowFeedbackRight(init);
+        wowFeedbackRight(() => {});
     } else if (question.correctness === 'wrong') {
-        wowFeedbackWrong(init);
+        wowFeedbackWrong(() => {});
     } else {
-        wowFeedbackMissed(init);
+        wowFeedbackMissed(() => {});
     }
 }
 
@@ -680,9 +709,18 @@ function storeQuestionAndSave() {
     save();
 }
 
+function completeQuestion() {
+    question.answeredAt = new Date().getTime();
+    stopCountDown();
+    showNextButton();
+    storeQuestionAndSave();
+    renderHQL(true);
+    wowFeedback();
+}
+
 function checkIfTrue() {
     trueButton.blur();
-    if (processingAnswer) {
+    if (processingAnswer || awaitingNext) {
         return;
     }
     processingAnswer = true;
@@ -694,15 +732,12 @@ function checkIfTrue() {
         appState.score--;
         question.correctness = 'wrong';
     }
-    question.answeredAt = new Date().getTime();
-    storeQuestionAndSave();
-    renderHQL(true);
-    wowFeedback();
+    completeQuestion();
 }
 
 function checkIfFalse() {
     falseButton.blur();
-    if (processingAnswer) {
+    if (processingAnswer || awaitingNext) {
         return;
     }
     processingAnswer = true;
@@ -714,24 +749,18 @@ function checkIfFalse() {
         appState.score--;
         question.correctness = 'wrong';
     }
-    question.answeredAt = new Date().getTime();
-    storeQuestionAndSave();
-    renderHQL(true);
-    wowFeedback();
+    completeQuestion();
 }
 
 function timeElapsed() {
-    if (processingAnswer) {
+    if (processingAnswer || awaitingNext) {
         return;
     }
     processingAnswer = true;
     appState.score--;
     question.correctness = 'missed';
     question.answerUser = undefined;
-    question.answeredAt = new Date().getTime();
-    storeQuestionAndSave();
-    renderHQL(true);
-    wowFeedback();
+    completeQuestion();
 }
 
 function resetApp() {
@@ -946,7 +975,7 @@ timerInput.addEventListener("input", evt => {
     timerCount = findStartingTimerCount();
     el.style.width = (el.value.length + 4) + 'ch';
     savedata.timer = el.value;
-    if (timerToggle.checked) {
+    if (timerToggle.checked && !awaitingNext) {
         stopCountDown();
         startCountDown();
     }
@@ -955,7 +984,7 @@ timerInput.addEventListener("input", evt => {
 
 function handleCountDown() {
     timerToggled = timerToggle.checked;
-    if (timerToggled)
+    if (timerToggled && !awaitingNext)
         startCountDown();
     else
         stopCountDown();

@@ -42,6 +42,61 @@ function readRelation(question) {
 }
 
 describe('RRT dimensions through 7D', () => {
+  it('stops timing after an answer and waits for NEXT before starting a new challenge', () => {
+    const answered = evaluate(`(() => {
+      timerToggle.checked = true;
+      handleCountDown();
+      const answeredQuestion = question;
+      checkIfTrue();
+      return {
+        timerRunning,
+        awaitingNext,
+        questionUnchanged: question === answeredQuestion,
+        trueHidden: trueButton.hidden,
+        falseHidden: falseButton.hidden,
+        nextHidden: nextQuestionButton.hidden,
+      };
+    })()`)
+
+    expect(answered).toEqual({
+      timerRunning: false,
+      awaitingNext: true,
+      questionUnchanged: true,
+      trueHidden: true,
+      falseHidden: true,
+      nextHidden: false,
+    })
+
+    const blockedAdvance = evaluate(`(() => {
+      const answeredQuestion = question;
+      init();
+      return {timerRunning, questionUnchanged: question === answeredQuestion};
+    })()`)
+    expect(blockedAdvance).toEqual({ timerRunning: false, questionUnchanged: true })
+
+    const advanced = evaluate(`(() => {
+      const answeredQuestion = question;
+      goNext();
+      return {
+        timerRunning,
+        awaitingNext,
+        questionChanged: question !== answeredQuestion,
+        trueHidden: trueButton.hidden,
+        falseHidden: falseButton.hidden,
+        nextHidden: nextQuestionButton.hidden,
+      };
+    })()`)
+
+    expect(advanced).toEqual({
+      timerRunning: true,
+      awaitingNext: false,
+      questionChanged: true,
+      trueHidden: false,
+      falseHidden: false,
+      nextHidden: true,
+    })
+  })
+
   it('sums only answer response times into the visible session time and clears it with the session', () => {
     evaluate(`
       appState.questions = [

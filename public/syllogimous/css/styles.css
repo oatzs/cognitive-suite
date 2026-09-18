@@ -621,11 +621,16 @@ input[type="number"]::-moz-inner-spin-button {
 }
 
 .confirmation-true,
-.confirmation-false {
+.confirmation-false,
+.confirmation-next {
     flex-grow: 1;
     font-size: var(--step-1);
     max-width: 10rem;
     padding: 0.3rem 0.7rem;
+}
+
+.confirmation-next {
+    min-width: 10rem;
 }
 
 .confirmation-true {
