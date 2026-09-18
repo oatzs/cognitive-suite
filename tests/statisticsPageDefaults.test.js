@@ -79,5 +79,8 @@ describe('Statistics page defaults', () => {
     expect(lifetime().textContent).toContain('Quad N-back')
     expect(lifetime().textContent).toContain('Dual N-back')
     expect(lifetime().querySelectorAll('[data-lifetime-card]')).toHaveLength(4)
+    expect(lifetime().querySelector('[data-lifetime-grid]').className).toContain('sm:grid-cols-4')
+    expect(target.querySelector('[data-testid="activity-lifetime-layout"]').className)
+      .toContain('xl:grid-cols-[max-content_minmax(0,1fr)]')
   })
 })

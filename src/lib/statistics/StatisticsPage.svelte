@@ -340,7 +340,7 @@
       </section>
 
       <section class="border-b border-base-300 py-5">
-        <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
+        <div class="grid gap-5 xl:grid-cols-[max-content_minmax(0,1fr)]" data-testid="activity-lifetime-layout">
           <div class="min-w-0">
             <div class="mb-3 flex items-center justify-between gap-4">
               <h2 class="text-sm font-semibold">Training activity</h2>
@@ -350,7 +350,10 @@
           </div>
           <aside class="border-t border-base-300 pt-4 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0" aria-label="Lifetime totals">
             <h2 class="mb-3 text-sm font-semibold">Lifetime totals</h2>
-            <div class="grid gap-2 {lifetimeCards.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}">
+            <div
+              class="grid gap-2 {lifetimeCards.length === 4 ? 'sm:grid-cols-4' : lifetimeCards.length === 2 ? 'sm:grid-cols-2' : 'grid-cols-1'}"
+              data-lifetime-grid
+            >
               {#each lifetimeCards as card (card.key)}
                 <div class="lifetime-card min-w-0 rounded-md border border-base-300 bg-base-200/50 px-3 py-2.5" data-lifetime-card={card.key}>
                   <span class="block truncate text-[0.7rem] opacity-60">{card.label}</span>
