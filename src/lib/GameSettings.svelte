@@ -122,8 +122,8 @@
 </div>
 {#if 'trialTime' in $gameSettings}
 <div class="flex flex-col gap-1">
-  <label class="text-base">Trial time: {$gameSettings.trialTime}ms
-    <input type="range" min="1000" max="5000" bind:value={$gameSettings.trialTime} step="100" class="range" />
+  <label class="text-base" for="trial-time-range">Trial time: {$gameSettings.trialTime}ms
+    <input id="trial-time-range" type="range" min="100" max="5000" bind:value={$gameSettings.trialTime} step="100" class="range" />
   </label>
 </div>
 {/if}
