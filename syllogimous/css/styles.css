@@ -652,6 +652,13 @@ input[type="number"]::-moz-inner-spin-button {
     gap: 18px;
 }
 
+.session-time-label {
+    margin-top: -0.35rem;
+    text-align: center;
+    font-size: var(--step--2);
+    opacity: 0.75;
+}
+
 .carousel {
     text-align: center;
 }

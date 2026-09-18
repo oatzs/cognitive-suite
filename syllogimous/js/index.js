@@ -26,6 +26,7 @@ const historyButton = document.querySelector(`label.open[for="offcanvas-history"
 const historyCheckbox = document.getElementById("offcanvas-history");
 const settingsButton = document.querySelector(`label.open[for="offcanvas-settings"]`);
 const totalDisplay = document.getElementById("total-display");
+const sessionTimeDisplay = document.querySelector(".session-time");
 const averageDisplay = document.getElementById("average-display");
 const averageCorrectDisplay = document.getElementById("average-correct-display");
 const percentCorrectDisplay = document.getElementById("percent-correct-display");
@@ -800,28 +801,35 @@ function renderHQL(didAddSingleQuestion=false) {
 function updateAverage(reverseChronological) {
     let questions = reverseChronological.filter(q => q.answeredAt && q.startedAt);
     let times = questions.map(q => (q.answeredAt - q.startedAt) / 1000);
+    const totalTime = times.reduce((a,b) => a + b, 0);
+    const roundedTotalSeconds = Math.max(0, Math.round(totalTime));
+    const minutes = Math.floor(roundedTotalSeconds / 60);
+    const seconds = roundedTotalSeconds % 60;
+    const formattedTotal = minutes + 'm ' + seconds + 's';
+
+    totalDisplay.textContent = formattedTotal;
+    sessionTimeDisplay.textContent = formattedTotal;
     if (times.length == 0) {
+        averageDisplay.textContent = '0.0s';
+        averageCorrectDisplay.textContent = 'None yet';
+        percentCorrectDisplay.textContent = '0.0%';
         return;
     }
-    const totalTime = times.reduce((a,b) => a + b, 0);
-    const minutes = Math.floor(totalTime / 60);
-    const seconds = totalTime % 60;
-    totalDisplay.innerHTML = minutes.toFixed(0) + 'm ' + seconds.toFixed(0) + 's';
     
     const average =  totalTime / times.length;
-    averageDisplay.innerHTML = average.toFixed(1) + 's';
+    averageDisplay.textContent = average.toFixed(1) + 's';
 
     const correctQuestions = questions.filter(q => q.correctness == 'right');
     const percentCorrect = 100 * correctQuestions.length / questions.length;
-    percentCorrectDisplay.innerHTML = percentCorrect.toFixed(1) + '%';
+    percentCorrectDisplay.textContent = percentCorrect.toFixed(1) + '%';
     const correctTimes = correctQuestions.map(q => (q.answeredAt - q.startedAt) / 1000);
     if (correctTimes.length == 0) {
-        averageCorrectDisplay.innerHTML = 'None yet';
+        averageCorrectDisplay.textContent = 'None yet';
         return;
     }
     const totalTimeBeingCorrect = correctTimes.reduce((a,b) => a + b, 0);
     const averageCorrect = totalTimeBeingCorrect / correctTimes.length;
-    averageCorrectDisplay.innerHTML = averageCorrect.toFixed(1) + 's';
+    averageCorrectDisplay.textContent = averageCorrect.toFixed(1) + 's';
 }
 
 function createHQLI(question, i) {
