@@ -81,7 +81,11 @@ describe('DocCT setup and session UI', () => {
     expect(timer?.classList.contains('hidden')).toBe(false);
   });
 
-  it('offers the requested starting and minimum interval presets', () => {
+  it('offers the requested duration and interval presets', () => {
+    for (const preset of [20, 25]) {
+      expect(findButton(target, String(preset))?.getAttribute('aria-label'))
+        .toBe(`Set duration to ${preset} minutes`);
+    }
     expect(findButton(target, '1.5')?.getAttribute('aria-label')).toBe('Set interval to 1.5 seconds');
     for (const preset of [0.6, 0.7, 0.8, 0.9]) {
       expect(findButton(target, String(preset))?.getAttribute('aria-label'))
