@@ -1,7 +1,7 @@
 {
   "name": "quad-box",
   "private": true,
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Quad Box, DocCT, Syllogimous, and ICT cognitive training suite",
   "author": "The Quad Box Project Contributors",
   "desktopName": "org.quadbox.cognitive-suite",
