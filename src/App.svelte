@@ -9,7 +9,7 @@ import { settings } from "./stores/settingsStore"
 import { setMobile } from "./stores/mobileStore"
 import { isPlaying } from "./stores/gameRunningStore"
 import { analytics } from "./stores/analyticsStore"
-import { addDocctSession, addSyllogimousSession, deleteGamesBySource } from "./lib/gamedb"
+import { addDocctSession, addIctSession, addSyllogimousSession, deleteGamesBySource } from "./lib/gamedb"
 import { error } from "./stores/errorStore"
 import { onMount, onDestroy } from "svelte"
 
@@ -97,6 +97,17 @@ const resetSyllogimousStatistics = async () => {
   }
 }
 
+const persistIctSession = async (session) => {
+  try {
+    await addIctSession(session)
+  } catch (reason) {
+    error.set({
+      message: reason?.message || 'Could not save the ICT session',
+      stacktrace: reason?.stack || reason,
+    })
+  }
+}
+
 onMount(() => {
   setMobile()
 })
@@ -177,7 +188,7 @@ onDestroy(async () => {
       {#await optionalViewPromise}
         <div class="flex h-full items-center justify-center"><span class="loading loading-spinner loading-lg"></span></div>
       {:then module}
-        <svelte:component this={module.default} onActiveChange={(active) => ictActive = active} />
+        <svelte:component this={module.default} onActiveChange={(active) => ictActive = active} onSessionComplete={persistIctSession} />
       {:catch reason}
         <div class="p-6 text-error">{reason?.message || 'Could not load ICT'}</div>
       {/await}

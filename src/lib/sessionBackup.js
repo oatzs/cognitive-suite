@@ -17,7 +17,7 @@ export class SessionBackupError extends Error {
 
 const isPlainObject = (value) => Object.prototype.toString.call(value) === '[object Object]'
 const unsafeObjectKeys = new Set(['__proto__', 'constructor', 'prototype'])
-const sessionSources = new Set(['quad-box', 'docct', 'syllogimous'])
+const sessionSources = new Set(['quad-box', 'docct', 'syllogimous', 'ict'])
 
 const finiteNumber = (value, field, { min = -Infinity, max = Infinity } = {}) => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
@@ -164,6 +164,47 @@ const sanitizeSyllogimous = (syllogimous) => {
   }
 }
 
+const sanitizeIct = (ict) => {
+  if (ict === undefined || ict === null) return undefined
+  if (!isPlainObject(ict)) throw new SessionBackupError('Invalid ICT session data')
+  const startedAt = requiredString(ict.startedAt, 'ICT start time')
+  const completedAt = requiredString(ict.completedAt, 'ICT completion time')
+  const startTimestamp = new Date(startedAt).getTime()
+  const completedTimestamp = new Date(completedAt).getTime()
+  if (!Number.isFinite(startTimestamp) || !Number.isFinite(completedTimestamp) || startTimestamp > completedTimestamp) {
+    throw new SessionBackupError('Invalid ICT session times')
+  }
+  const durationSec = finiteNumber(ict.durationSec, 'ICT duration', { min: 0, max: MAX_DURATION_SECONDS })
+  if (durationSec > (completedTimestamp - startTimestamp) / 1000) throw new SessionBackupError('Invalid ICT duration')
+  const mode = requiredString(ict.mode, 'ICT mode', 50)
+  if (!['color', 'shape', 'letter', 'number', 'image', 'set', 'mixed', 'switch'].includes(mode)) {
+    throw new SessionBackupError('Invalid ICT mode')
+  }
+  const correctCount = integerNumber(ict.correctCount, 'ICT correct count', { min: 0, max: MAX_COUNT })
+  const totalAnswers = integerNumber(ict.totalAnswers, 'ICT answer count', { min: 1, max: MAX_COUNT })
+  if (correctCount > totalAnswers) throw new SessionBackupError('Invalid ICT answer counts')
+  if (typeof ict.adaptive !== 'boolean' || typeof ict.endedEarly !== 'boolean') throw new SessionBackupError('Invalid ICT session settings')
+  const startingWindowMs = finiteNumber(ict.startingWindowMs, 'ICT starting window', { min: 1, max: MAX_INTERVAL_MS })
+  const minimumWindowMs = finiteNumber(ict.minimumWindowMs, 'ICT minimum window', { min: 1, max: MAX_INTERVAL_MS })
+  if (ict.adaptive && minimumWindowMs > startingWindowMs) throw new SessionBackupError('Invalid ICT minimum window')
+  return {
+    sessionId: requiredString(ict.sessionId, 'ICT session ID'),
+    startedAt,
+    completedAt,
+    durationSec,
+    mode,
+    adaptive: ict.adaptive,
+    startingWindowMs,
+    minimumWindowMs,
+    fastestIntervalMs: finiteNumber(ict.fastestIntervalMs, 'ICT fastest interval', { min: 1, max: MAX_INTERVAL_MS }),
+    endingIntervalMs: finiteNumber(ict.endingIntervalMs, 'ICT ending interval', { min: 1, max: MAX_INTERVAL_MS }),
+    correctCount,
+    totalAnswers,
+    averageResponseTimeMs: finiteNumber(ict.averageResponseTimeMs, 'ICT response time', { min: 0, max: MAX_INTERVAL_MS }),
+    endedEarly: ict.endedEarly,
+  }
+}
+
 export function toPortableSession(game) {
   if (!isPlainObject(game)) throw new SessionBackupError('Invalid session record')
   if (game.status !== 'completed') throw new SessionBackupError('Only completed sessions can be imported')
@@ -194,7 +235,7 @@ export function toPortableSession(game) {
     completedTrials: integerNumber(game.completedTrials, 'completed trials', { min: 0, max: MAX_COUNT }),
   }
 
-  if (source !== 'syllogimous' || game.nBack !== undefined) {
+  if (!['syllogimous', 'ict'].includes(source) || game.nBack !== undefined) {
     sanitized.nBack = finiteNumber(game.nBack, 'n-back level', { min: 0, max: 100 })
   }
 
@@ -243,6 +284,24 @@ export function toPortableSession(game) {
     sanitized.syllogimous = syllogimous
   } else if (source === 'syllogimous') {
     throw new SessionBackupError('Syllogimous session data is required')
+  }
+  const ict = sanitizeIct(game.ict)
+  if (ict) {
+    if (source !== 'ict' || new Date(ict.completedAt).getTime() !== timestamp || new Date(ict.startedAt).getTime() !== sanitized.start) {
+      throw new SessionBackupError('ICT session times do not match session timestamps')
+    }
+    if (ict.sessionId !== sanitized.sessionId || ict.sessionId !== sanitized.sourceSessionId) {
+      throw new SessionBackupError('ICT session identity does not match session ID')
+    }
+    if (sanitized.mode !== 'ict' || sanitized.variant !== ict.mode || sanitized.completedTrials !== ict.totalAnswers ||
+        sanitized.tags.length !== 1 || sanitized.tags[0] !== 'answer' || Object.keys(sanitized.scores).length !== 1 ||
+        sanitized.scores.answer?.hits !== ict.correctCount || sanitized.scores.answer?.misses !== ict.totalAnswers - ict.correctCount) {
+      throw new SessionBackupError('ICT session scores do not match session data')
+    }
+    if (sanitized.nBack !== undefined) throw new SessionBackupError('ICT sessions cannot have an n-back level')
+    sanitized.ict = ict
+  } else if (source === 'ict') {
+    throw new SessionBackupError('ICT session data is required')
   }
   return sanitized
 }

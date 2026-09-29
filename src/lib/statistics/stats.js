@@ -44,8 +44,8 @@ const metricExplanations = {
     examples: ['50% → 2.00', '80% → 2.60', '100% → 3.00'],
   },
   fastestInterval: {
-    summary: 'Shows the shortest stimulus interval reached during a DocCT session.',
-    detail: 'Measured in seconds. A lower value means the session reached a faster pace.',
+    summary: 'Shows the shortest response interval reached during a session.',
+    detail: 'Measured in seconds for DocCT and ICT. A lower value means the session reached a faster pace.',
   },
   responseTime: {
     summary: 'Shows the average time between a prompt and the response.',
@@ -110,15 +110,19 @@ export function normalizeGame(game) {
     ? 'docct'
     : game.source === 'syllogimous'
       ? 'syllogimous'
-      : 'quad-box'
+      : game.source === 'ict'
+        ? 'ict'
+        : 'quad-box'
   const timestamp = numberOrNull(game.timestamp) ?? Date.now()
   const hits = numberOrNull(game.total?.hits)
     ?? numberOrNull(game.docct?.correctCount)
     ?? numberOrNull(game.syllogimous?.correctCount)
+    ?? numberOrNull(game.ict?.correctCount)
     ?? 0
   const possible = numberOrNull(game.total?.possible)
     ?? numberOrNull(game.docct?.totalAnswers)
     ?? numberOrNull(game.syllogimous?.totalAnswers)
+    ?? numberOrNull(game.ict?.totalAnswers)
     ?? 0
   const accuracy = numberOrNull(game.total?.percent)
     ?? numberOrNull(game.docct?.accuracy)
@@ -127,6 +131,8 @@ export function normalizeGame(game) {
     ? game.variant || game.docct?.mode || '1-back'
     : source === 'syllogimous'
       ? game.variant || game.syllogimous?.mode || 'mixed'
+      : source === 'ict'
+        ? game.variant || game.ict?.mode || 'color'
     : game.variant || game.title || game.mode || 'custom'
   const variant = source === 'quad-box' && (recordedVariant === 'tri' || String(recordedVariant).toLowerCase().startsWith('custom'))
     ? 'custom'
@@ -149,7 +155,7 @@ export function normalizeGame(game) {
   return {
     id: game.id,
     source,
-    sourceLabel: source === 'docct' ? 'DocCT' : source === 'syllogimous' ? 'Syllogimous' : 'Quad Box',
+    sourceLabel: source === 'docct' ? 'DocCT' : source === 'syllogimous' ? 'Syllogimous' : source === 'ict' ? 'ICT' : 'Quad Box',
     timestamp,
     completedAt: new Date(timestamp),
     day: getGameDay(timestamp),
@@ -157,15 +163,15 @@ export function normalizeGame(game) {
     variant,
     modeKey: `${source}:${variant}`,
     modeLabel: source === 'docct' ? titleCase(variant) : titleCase(variant),
-    nLevel: numberOrNull(game.nBack),
+    nLevel: source === 'ict' ? null : numberOrNull(game.nBack),
     accuracy,
-    durationSec: Math.max(0, numberOrNull(game.elapsedSeconds) ?? numberOrNull(game.docct?.durationSec) ?? numberOrNull(game.syllogimous?.durationSec) ?? 0),
+    durationSec: Math.max(0, numberOrNull(game.elapsedSeconds) ?? numberOrNull(game.docct?.durationSec) ?? numberOrNull(game.syllogimous?.durationSec) ?? numberOrNull(game.ict?.durationSec) ?? 0),
     hits,
     possible,
     modalities,
-    fastestIntervalMs: numberOrNull(game.docct?.fastestIntervalMs),
-    endingIntervalMs: numberOrNull(game.docct?.endingIntervalMs),
-    responseTimeMs: numberOrNull(game.docct?.averageResponseTimeMs) ?? numberOrNull(game.syllogimous?.averageResponseTimeMs),
+    fastestIntervalMs: numberOrNull(game.docct?.fastestIntervalMs) ?? numberOrNull(game.ict?.fastestIntervalMs),
+    endingIntervalMs: numberOrNull(game.docct?.endingIntervalMs) ?? numberOrNull(game.ict?.endingIntervalMs),
+    responseTimeMs: numberOrNull(game.docct?.averageResponseTimeMs) ?? numberOrNull(game.syllogimous?.averageResponseTimeMs) ?? numberOrNull(game.ict?.averageResponseTimeMs),
     streaks: numberOrNull(game.docct?.streaks),
     averagePremises: numberOrNull(game.syllogimous?.averagePremises),
     raw: game,
@@ -184,7 +190,7 @@ const primaryProgressModes = [
 ]
 
 export function getProgressModeOptions(sessions, source = 'all') {
-  if (source === 'docct' || source === 'syllogimous') {
+  if (source === 'docct' || source === 'syllogimous' || source === 'ict') {
     const options = new Map()
     for (const session of sessions) {
       if (session.source !== source || options.has(session.modeKey)) continue
@@ -384,6 +390,7 @@ export function getLifetimeTotals(sessions) {
     rrt: emptyLifetimeTotal(),
     quad: emptyLifetimeTotal(),
     dual: emptyLifetimeTotal(),
+    ict: emptyLifetimeTotal(),
   }
 
   for (const session of sessions) {
@@ -391,6 +398,8 @@ export function getLifetimeTotals(sessions) {
       ? 'docct'
       : session.source === 'syllogimous'
         ? 'rrt'
+        : session.source === 'ict'
+          ? 'ict'
         : session.modeKey === 'quad-box:quad'
           ? 'quad'
           : session.modeKey === 'quad-box:dual'

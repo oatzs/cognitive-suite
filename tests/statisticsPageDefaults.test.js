@@ -56,7 +56,7 @@ describe('Statistics page defaults', () => {
     expect(target.querySelector('[data-measure-option="accuracy"]')).toBeNull()
   })
 
-  it('shows trainer-specific lifetime cards and all four cards for all trainers', async () => {
+  it('shows trainer-specific lifetime cards and all five cards for all trainers', async () => {
     target = document.createElement('div')
     document.body.append(target)
     component = mount(StatisticsPage, { target })
@@ -78,9 +78,21 @@ describe('Statistics page defaults', () => {
     expect(lifetime().textContent).toContain('RRT')
     expect(lifetime().textContent).toContain('Quad N-back')
     expect(lifetime().textContent).toContain('Dual N-back')
-    expect(lifetime().querySelectorAll('[data-lifetime-card]')).toHaveLength(4)
-    expect(lifetime().querySelector('[data-lifetime-grid]').className).toContain('sm:grid-cols-4')
+    expect(lifetime().textContent).toContain('ICT')
+    expect(lifetime().querySelectorAll('[data-lifetime-card]')).toHaveLength(5)
+    expect(lifetime().querySelector('[data-lifetime-grid]').className).toContain('2xl:grid-cols-5')
     expect(target.querySelector('[data-testid="activity-lifetime-layout"]').className)
       .toContain('xl:grid-cols-[max-content_minmax(0,1fr)]')
+
+    trainer.value = 'ict'
+    trainer.dispatchEvent(new Event('change', { bubbles: true }))
+    await tick()
+    expect(lifetime().querySelectorAll('[data-lifetime-card]')).toHaveLength(1)
+    expect(lifetime().querySelector('[data-lifetime-card="ict"]')).not.toBeNull()
+    expect(target.querySelector('[data-measure-trigger]').textContent).toContain('Accuracy')
+    target.querySelector('[data-measure-trigger]').click()
+    await tick()
+    expect(target.querySelector('[data-measure-option="fastestInterval"]')).not.toBeNull()
+    expect(target.querySelector('[data-measure-option="adjusted"]')).toBeNull()
   })
 })

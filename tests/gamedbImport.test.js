@@ -4,6 +4,7 @@ import fc from 'fast-check'
 import {
   addDocctSession,
   addImportedGames,
+  addIctSession,
   addSyllogimousSession,
   deleteDB,
   deleteGamesBySource,
@@ -47,6 +48,24 @@ const syllogimousSession = (timestamp = Date.now()) => ({
   averageResponseTimeMs: 1250,
   averagePremises: 3.4,
   categoryCounts: { syllogism: 10 },
+})
+
+const ictSession = (timestamp = Date.now(), overrides = {}) => ({
+  sessionId: 'ict-session-a',
+  startedAt: new Date(timestamp - 30_000).toISOString(),
+  completedAt: new Date(timestamp).toISOString(),
+  durationSec: 30,
+  mode: 'color',
+  adaptive: true,
+  startingWindowMs: 1000,
+  minimumWindowMs: 350,
+  fastestIntervalMs: 850,
+  endingIntervalMs: 900,
+  correctCount: 7,
+  totalAnswers: 10,
+  averageResponseTimeMs: 410,
+  endedEarly: false,
+  ...overrides,
 })
 
 describe('imported game persistence', () => {
@@ -128,6 +147,47 @@ describe('imported game persistence', () => {
       playTime: 0,
       sessionCount: 0,
     })
+  })
+
+  it('stores an ICT session once and round-trips its portable history without affecting N-back summaries', async () => {
+    const input = ictSession()
+    await expect(addIctSession(input)).resolves.toBe(true)
+    await expect(addIctSession(structuredClone(input))).resolves.toBe(false)
+    const stored = await getAllCompletedGames()
+    expect(stored).toHaveLength(1)
+    expect(stored[0]).toMatchObject({
+      sessionId: input.sessionId,
+      source: 'ict',
+      sourceSessionId: input.sessionId,
+      variant: 'color',
+      completedTrials: 10,
+      elapsedSeconds: 30,
+      total: { hits: 7, misses: 3, possible: 10, percent: 0.7 },
+      ict: input,
+    })
+    expect(stored[0]).not.toHaveProperty('nBack')
+    const normalized = normalizeGames(stored)
+    expect(normalized[0]).toMatchObject({ source: 'ict', nLevel: null, durationSec: 30, accuracy: 0.7 })
+    const portable = parseSessionBackup(serializeSessionBackup(stored))
+    expect(portable.games[0].ict).toEqual(input)
+    await deleteDB()
+    await addImportedGames(portable.games)
+    expect(normalizeGames(await getAllCompletedGames())[0]).toMatchObject({ source: 'ict', durationSec: 30, accuracy: 0.7 })
+    await expect(getTrainingSummarySince4AM()).resolves.toEqual({ playTime: 0, sessionCount: 0 })
+  })
+
+  it('keeps real ICT sessions ended early but ignores zero scored trials and invalid data', async () => {
+    const now = Date.now()
+    await expect(addIctSession(ictSession(now, { totalAnswers: 0, correctCount: 0 }))).resolves.toBe(false)
+    await expect(addIctSession(ictSession(now, { mode: 'unknown' }))).resolves.toBe(false)
+    await expect(addIctSession(ictSession(now, { durationSec: 31 }))).resolves.toBe(false)
+    await expect(addIctSession(ictSession(now, { correctCount: 11 }))).resolves.toBe(false)
+    await expect(addIctSession(ictSession(now, { minimumWindowMs: 1100 }))).resolves.toBe(false)
+    await expect(getAllCompletedGames()).resolves.toEqual([])
+    await expect(addIctSession(ictSession(now, { totalAnswers: 1, correctCount: 1, endedEarly: true }))).resolves.toBe(true)
+    const stored = await getAllCompletedGames()
+    expect(stored).toHaveLength(1)
+    expect(stored[0].ict.endedEarly).toBe(true)
   })
 
   it('clears Syllogimous statistics without deleting another trainer’s history', async () => {

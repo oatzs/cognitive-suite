@@ -169,6 +169,32 @@ describe('session normalization and game days', () => {
     })
   })
 
+  it('normalizes ICT go/no-go performance without inventing an n-back level', () => {
+    const normalized = normalizeGame({
+      source: 'ict',
+      timestamp: new Date(2026, 0, 6, 12).getTime(),
+      status: 'completed',
+      variant: 'switch',
+      tags: ['answer'],
+      scores: { answer: { hits: 9, misses: 1 } },
+      ict: {
+        durationSec: 42,
+        correctCount: 9,
+        totalAnswers: 10,
+        fastestIntervalMs: 850,
+        endingIntervalMs: 900,
+        averageResponseTimeMs: 410,
+      },
+    })
+    expect(normalized).toMatchObject({
+      source: 'ict', sourceLabel: 'ICT', modeKey: 'ict:switch', modeLabel: 'Switch',
+      nLevel: null, accuracy: 0.9, durationSec: 42, hits: 9, possible: 10,
+      fastestIntervalMs: 850, endingIntervalMs: 900, responseTimeMs: 410,
+    })
+    expect(metricValue(normalized, 'adjusted')).toBeNull()
+    expect(metricValue(normalized, 'fastestInterval')).toBe(0.85)
+  })
+
   it('groups generated tri configurations under Custom N-back', () => {
     const normalized = normalizeGame({
       timestamp: new Date(2026, 0, 6, 12).getTime(),
@@ -269,6 +295,17 @@ describe('statistics aggregation', () => {
     expect(metricValue(result, 'n')).toBeNull()
   })
 
+  it('offers recorded ICT modes without mixing other trainer modes into its progress', () => {
+    expect(getProgressModeOptions([
+      session({ source: 'ict', modeKey: 'ict:switch', modeLabel: 'Switch' }),
+      session({ source: 'ict', modeKey: 'ict:color', modeLabel: 'Color' }),
+      session(),
+    ], 'ict')).toEqual([
+      { key: 'ict:color', label: 'Color', source: 'ict' },
+      { key: 'ict:switch', label: 'Switch', source: 'ict' },
+    ])
+  })
+
   it('initially selects Quad when only Quad has progress data', () => {
     const sessions = [
       session({ modeKey: 'quad-box:quad', modeLabel: 'Quad', variant: 'quad' }),
@@ -363,6 +400,8 @@ describe('statistics aggregation', () => {
       session({ modeKey: 'quad-box:quad', durationSec: 120 }),
       session({ modeKey: 'quad-box:dual', durationSec: 60 }),
       session({ modeKey: 'quad-box:custom', durationSec: 300 }),
+      session({ source: 'ict', modeKey: 'ict:color', durationSec: 45 }),
+      session({ source: 'ict', modeKey: 'ict:switch', durationSec: 15 }),
     ])
 
     expect(totals).toEqual({
@@ -370,6 +409,7 @@ describe('statistics aggregation', () => {
       rrt: { sessions: 1, durationSec: 6 },
       quad: { sessions: 1, durationSec: 120 },
       dual: { sessions: 1, durationSec: 60 },
+      ict: { sessions: 2, durationSec: 60 },
     })
   })
 

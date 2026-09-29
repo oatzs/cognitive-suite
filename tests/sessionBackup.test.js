@@ -66,6 +66,42 @@ const syllogimousSession = () => {
   }
 }
 
+const ictSession = () => {
+  const sessionId = 'ict-test-session'
+  const startedAt = '2026-08-23T11:59:30.000Z'
+  const completedAt = '2026-08-23T12:00:00.000Z'
+  return {
+    sessionId,
+    sourceSessionId: sessionId,
+    source: 'ict',
+    timestamp: new Date(completedAt).getTime(),
+    start: new Date(startedAt).getTime(),
+    status: 'completed',
+    title: 'ict switch',
+    mode: 'ict',
+    variant: 'switch',
+    tags: ['answer'],
+    scores: { answer: { hits: 7, misses: 3 } },
+    completedTrials: 10,
+    ict: {
+      sessionId,
+      startedAt,
+      completedAt,
+      durationSec: 30,
+      mode: 'switch',
+      adaptive: true,
+      startingWindowMs: 1000,
+      minimumWindowMs: 350,
+      fastestIntervalMs: 800,
+      endingIntervalMs: 900,
+      correctCount: 7,
+      totalAnswers: 10,
+      averageResponseTimeMs: 410,
+      endedEarly: true,
+    },
+  }
+}
+
 describe('session backup codec', () => {
   it('round-trips portable session data and removes local/derived fields', () => {
     fc.assert(fc.property(
@@ -142,6 +178,35 @@ describe('session backup codec', () => {
 
     expect(parsed.schemaVersion).toBe(2)
     expect(parsed.games).toEqual([{ source: 'quad-box', ...legacyGame }])
+  })
+
+  it('round-trips ICT settings and completed early sessions with no n-back level', () => {
+    const game = ictSession()
+    const parsed = parseSessionBackup(serializeSessionBackup([game]))
+    expect(parsed.games).toEqual([game])
+    expect(parsed.games[0]).not.toHaveProperty('nBack')
+    expect(planSessionMerge([game], parsed.games)).toEqual({ additions: [], duplicates: 1 })
+  })
+
+  it('rejects malformed or inconsistent ICT metadata before persistence', () => {
+    const cases = [
+      [game => { delete game.ict }, 'ICT session data is required'],
+      [game => { game.ict.mode = 'unknown' }, 'Invalid ICT mode'],
+      [game => { game.ict.durationSec = 31 }, 'Invalid ICT duration'],
+      [game => { game.ict.adaptive = 'false' }, 'Invalid ICT session settings'],
+      [game => { game.ict.minimumWindowMs = 1001 }, 'Invalid ICT minimum window'],
+      [game => { game.ict.totalAnswers = 0 }, 'Invalid ICT answer count'],
+      [game => { game.ict.sessionId = 'other-session' }, 'ICT session identity'],
+      [game => { game.ict.completedAt = '2026-08-23T12:00:01.000Z' }, 'ICT session times'],
+      [game => { game.completedTrials = 9 }, 'ICT session scores'],
+      [game => { game.scores.answer.hits = 6 }, 'ICT session scores'],
+      [game => { game.nBack = 2 }, 'ICT sessions cannot have an n-back level'],
+    ]
+    for (const [mutate, message] of cases) {
+      const game = ictSession()
+      mutate(game)
+      expect(() => createSessionBackup([game])).toThrow(message)
+    }
   })
 
   it('rejects malformed JSON and unsupported backup versions', () => {

@@ -9,7 +9,7 @@ If you want to try it out online:
 ## QOL Improvements:
 
 - Simple navigation between Quad Box, DocCT, Syllogimous, ICT, and a shared Statistics page.
-- A combined history view for Quad Box, DocCT, and Syllogimous, with filters for trainer, mode, and date range.
+- A combined history view for Quad Box, DocCT, Syllogimous, and ICT, with filters for trainer, mode, and date range.
 - Separate progress charts for Dual, Quad, Custom, DocCT, and Syllogimous modes, with only the measures that make sense for each trainer.
 - Daily session counts alongside training time, a 12-month activity heatmap, streak tracking, best scores, recent sessions, and per-modality accuracy. Training days roll over at 4:00 AM, so late-night sessions stay together.
 - JSON backup and restore for moving completed sessions between devices. Imports merge histories and skip duplicates instead of overwriting existing data. This means you can combine your training data from multiple devices onto one and get a full picture of your long term training data!
@@ -44,7 +44,11 @@ https://github.com/soamsy/Syllogimous-v3
 
 https://ict-five-tau.vercel.app/
 
-ICT stores its settings locally and can export completed results as JSON or CSV.
+ICT saves settings separately for each of its eight modes. Adaptive pacing has
+configurable starting and minimum response windows in milliseconds. Statistics
+includes ICT lifetime time and session counts. Practice and menus are excluded;
+ending a real run after at least one scored trial saves its training time.
+Tracking starts with this update; earlier ICT runs were not stored.
 
 ## Progress tracking
 
@@ -75,8 +79,8 @@ show a security warning on first launch.
 
 Imports are additive: sessions from both devices are merged, duplicates are
 skipped, and malformed or conflicting backups make no changes. The JSON backup
-contains completed Quad Box and DocCT sessions plus completed timed Syllogimous
-runs. It does not contain application settings, Syllogimous profiles, or the
+contains completed Quad Box and DocCT sessions, completed timed Syllogimous
+runs, and recorded ICT runs. It does not contain application settings, Syllogimous profiles, or the
 game's full per-question history.
 Treat backup files as private training data.
 

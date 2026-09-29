@@ -47,6 +47,24 @@
     return Object.assign({}, defaults, ICT.load(key) || {});
   };
 
+  ICT.loadMode = function (variant) {
+    const modes = ICT.load('modes');
+    const saved = modes && Object.hasOwn(modes, variant) ? modes[variant] : null;
+    const legacy = ICT.load('ict');
+    const cfg = Object.assign({}, ICT.GNG.DEFAULTS,
+      saved || (legacy && legacy.variant === variant ? legacy : {}), { variant });
+    if (!saved && legacy && legacy.variant === variant && legacy.adaptStartMs === undefined) {
+      cfg.adaptStartMs = legacy.stimMs || ICT.GNG.DEFAULTS.adaptStartMs;
+    }
+    return cfg;
+  };
+
+  ICT.saveMode = function (cfg) {
+    const modes = ICT.load('modes') || {};
+    modes[cfg.variant] = Object.assign({}, cfg);
+    ICT.save('modes', modes);
+  };
+
   ICT.download = function (filename, content, mime) {
     const blob = new Blob([content], { type: mime || 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -98,9 +116,7 @@
 
 
     root.querySelectorAll('[data-variant]').forEach(b => b.addEventListener('click', () => {
-      const cfg = ICT.mergeCfg('ict', ICT.defaults);
-      cfg.variant = b.dataset.variant;
-      ICT.GNG.start(cfg, root);
+      ICT.GNG.start(ICT.loadMode(b.dataset.variant), root);
     }));
   };
 

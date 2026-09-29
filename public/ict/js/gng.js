@@ -187,7 +187,7 @@
 
   const DEFAULTS = {
     variant: 'color', trials: 120, noGoRate: 0.5, practice: true,
-    adaptive: false, adaptStep: 20, adaptMin: 350, adaptMax: 1500,
+    adaptive: false, adaptStartMs: 1000, adaptStep: 20, adaptMin: 350, adaptMax: 1500,
     fixMs: 300, cueMs: 800, stimMs: 1000, itiMs: 400, revealMs: 400,
     varySize: true, multiColor: false, similar: false, rewards: false,
     capacity: 3, setImages: false, setSpan: 1,
@@ -359,8 +359,16 @@
 
   GNG.start = function (cfg, root) {
     this.cfg = Object.assign({}, DEFAULTS, cfg);
+    for (const key of ['adaptStartMs', 'adaptMin']) {
+      const value = Number(this.cfg[key]);
+      this.cfg[key] = Number.isFinite(value) ? Math.round(Math.max(50, Math.min(10000, value))) : DEFAULTS[key];
+    }
+    this.cfg.adaptMin = Math.min(this.cfg.adaptMin, this.cfg.adaptStartMs);
+    this.cfg.adaptMax = Math.max(DEFAULTS.adaptMax, this.cfg.adaptStartMs);
     this.root = root;
     this._disposed = false;
+    this._sessionStartedAt = null;
+    this._sessionRecorded = false;
     this._timers = [];
     this._onKey = (e) => this._handleKey(e);
     window.addEventListener('keydown', this._onKey, true);
@@ -368,6 +376,7 @@
   };
 
   GNG.destroy = function () {
+    this._recordSession(true);
     ICT.setActive(false);
     this._disposed = true;
     (this._timers || []).forEach(clearTimeout);
@@ -494,6 +503,12 @@
             <input type="checkbox" data-adaptive ${c.adaptive ? 'checked' : ''} />
             Adaptive pacing — quickens when you're accurate, eases when you're not
           </label>
+          <label>Starting response window (ms)
+            <input type="number" data-adaptstart required min="50" max="10000" step="1" value="${c.adaptStartMs}" ${c.adaptive ? '' : 'disabled'} />
+          </label>
+          <label>Minimum response window (ms)
+            <input type="number" data-adaptmin required min="50" max="10000" step="1" value="${c.adaptMin}" ${c.adaptive ? '' : 'disabled'} />
+          </label>
           ${v.switch ? `
           <label>Forbidden item dimension
             <select data-switchdim>
@@ -555,15 +570,37 @@
               : 'The set changes every trial.'}` : ''}
           ${v.generate && c.similar ? '<br/><b>Similarity on:</b> the forbidden item is an exact image, and other images are generated to look nearly identical to it — you must compare details before deciding to press.' : ''}
           ${v.switch ? `<br/><b>Switch mode:</b> the forbidden item is <b>Mixed</b> — the dimension switches every trial. ${c.learnSwitches !== false ? 'After every correct trial an <b>arrow (← or →)</b> sets the response keys — it points to the side that is now <b>FORBIDDEN</b>. Remember it: the keys flip when the arrow flips. The mapping is shown during practice only.' : 'Key switching is off — the mapping stays fixed.'}` : ''}
-          ${c.adaptive ? '<br/><b>Adaptive:</b> your response window starts at ' + c.stimMs + ' ms and moves toward your skill level (min ' + c.adaptMin + ' ms, max ' + c.adaptMax + ' ms).' : ''}
+          <span data-adaptive-note ${c.adaptive ? '' : 'hidden'}></span>
         </div>
         <button class="btn primary big" data-start>Start</button>
       </div>`;
     root.querySelector('[data-home]').addEventListener('click', (e) => { e.preventDefault(); this.destroy(); ICT.home(); });
+    const adaptive = root.querySelector('[data-adaptive]');
+    const startMs = root.querySelector('[data-adaptstart]');
+    const minMs = root.querySelector('[data-adaptmin]');
+    const updateAdaptive = () => {
+      startMs.disabled = minMs.disabled = !adaptive.checked;
+      minMs.setCustomValidity(adaptive.checked && Number(minMs.value) > Number(startMs.value)
+        ? 'Minimum response window must be no greater than the starting response window.' : '');
+      const note = root.querySelector('[data-adaptive-note]');
+      note.hidden = !adaptive.checked;
+      note.textContent = ` Adaptive: starts at ${startMs.value} ms, with a minimum of ${minMs.value} ms. Settings are saved separately for each mode.`;
+    };
+    adaptive.addEventListener('change', updateAdaptive);
+    startMs.addEventListener('input', updateAdaptive);
+    minMs.addEventListener('input', updateAdaptive);
+    updateAdaptive();
     root.querySelector('[data-start]').addEventListener('click', () => {
+      updateAdaptive();
+      if (adaptive.checked && (!startMs.reportValidity() || !minMs.reportValidity())) return;
       this.cfg.trials = parseInt(root.querySelector('[data-trials]').value, 10);
       this.cfg.practice = root.querySelector('[data-practice]').checked;
-      this.cfg.adaptive = root.querySelector('[data-adaptive]').checked;
+      this.cfg.adaptive = adaptive.checked;
+      if (this.cfg.adaptive) {
+        this.cfg.adaptStartMs = Number(startMs.value);
+        this.cfg.adaptMin = Number(minMs.value);
+        this.cfg.adaptMax = Math.max(DEFAULTS.adaptMax, this.cfg.adaptStartMs);
+      }
       const tkEl = root.querySelector('[data-twokey]');
       if (tkEl) this.cfg.twoKey = tkEl.checked;
       const fkEl = root.querySelector('[data-forbidkey]');
@@ -587,7 +624,7 @@
       if (siEl) this.cfg.setImages = siEl.checked;
       const spEl = root.querySelector('[data-setspan]');
       if (spEl) this.cfg.setSpan = parseInt(spEl.value, 10);
-      ICT.save('ict', this.cfg);
+      ICT.saveMode(this.cfg);
       this.begin();
     });
   };
@@ -596,8 +633,8 @@
 
   GNG.begin = function () {
     ICT.setActive(true);
-    this.stimMs = this.cfg.stimMs;
-    this.minStimMs = this.cfg.stimMs;
+    this.stimMs = this.cfg.adaptive ? this.cfg.adaptStartMs : this.cfg.stimMs;
+    this.minStimMs = this.stimMs;
     this.log = [];
     this.forbidSide = this.cfg.variant === 'switch'
       ? (Math.random() < 0.5 ? 'left' : 'right')
@@ -648,8 +685,8 @@
   };
 
   GNG._runSession = function () {
-    this.stimMs = this.cfg.stimMs;
-    this.minStimMs = this.cfg.stimMs;
+    this.stimMs = this.cfg.adaptive ? this.cfg.adaptStartMs : this.cfg.stimMs;
+    this.minStimMs = this.stimMs;
     const run = () => this._runTrials(ICT.buildGNGSequence(this.cfg), () => this._results(), false);
     if (this.cfg.variant === 'switch') {
       this.forbidSide = Math.random() < 0.5 ? 'left' : 'right';
@@ -686,6 +723,13 @@
   };
 
   GNG._runTrials = function (trials, done, isPractice) {
+    if (!isPractice) {
+      this._sessionStartedAt = Date.now();
+      this._sessionRecorded = false;
+      this._sessionId = global.crypto && global.crypto.randomUUID
+        ? global.crypto.randomUUID()
+        : `ict:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    }
     this.trials = trials;
     this.isPractice = isPractice;
     this._blockDone = done;
@@ -919,6 +963,32 @@
 
   /* ---------------- results ---------------- */
 
+  GNG._recordSession = function (endedEarly) {
+    if (this._sessionStartedAt === null || this._sessionRecorded) return;
+    this._sessionRecorded = true;
+    const real = (this.log || []).filter(t => !t.isPractice);
+    if (!real.length) return;
+    const completedAt = Date.now();
+    const startedAt = Math.min(completedAt, Math.max(completedAt - 86400000, this._sessionStartedAt));
+    const responseTimes = real.filter(t => t.response && Number.isFinite(t.rt)).map(t => t.rt);
+    ICT.notifySuite('session-complete', { session: {
+      sessionId: this._sessionId,
+      startedAt: new Date(startedAt).toISOString(),
+      completedAt: new Date(completedAt).toISOString(),
+      durationSec: (completedAt - startedAt) / 1000,
+      mode: this.cfg.variant,
+      adaptive: !!this.cfg.adaptive,
+      startingWindowMs: this.cfg.adaptive ? this.cfg.adaptStartMs : this.cfg.stimMs,
+      minimumWindowMs: this.cfg.adaptMin,
+      fastestIntervalMs: this.minStimMs,
+      endingIntervalMs: this.stimMs,
+      correctCount: real.filter(t => t.correct).length,
+      totalAnswers: real.length,
+      averageResponseTimeMs: responseTimes.length ? ICT.mean(responseTimes) : 0,
+      endedEarly: !!endedEarly,
+    } });
+  };
+
   GNG._summarize = function (trials) {
     const go = trials.filter(t => !t.isNoGo);
     const nogo = trials.filter(t => t.isNoGo);
@@ -948,6 +1018,7 @@
   };
 
   GNG._results = function () {
+    this._recordSession(false);
     ICT.setActive(false);
     const root = this.root;
     const v = VARIANTS[this.cfg.variant];

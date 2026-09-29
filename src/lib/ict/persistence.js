@@ -1,4 +1,4 @@
-export const ICT_STORAGE_KEYS = ['ict.ict']
+export const ICT_STORAGE_KEYS = ['ict.ict', 'ict.modes']
 
 export function clearIctPersistence(storage = globalThis.localStorage) {
   if (!storage) return

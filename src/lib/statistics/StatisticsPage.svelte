@@ -45,23 +45,28 @@
   const nbackMetrics = ['adjusted', 'brainWorkshop', 'sessions', 'n', 'nAccuracy', 'weightedAccuracy']
   const docctMetrics = [...nbackMetrics, 'fastestInterval', 'responseTime']
   const syllogimousMetrics = ['accuracy', 'sessions', 'responseTime']
+  const ictMetrics = ['accuracy', 'sessions', 'responseTime', 'fastestInterval']
   const metricsForSource = (trainer) => trainer === 'docct'
     ? docctMetrics
     : trainer === 'syllogimous'
       ? syllogimousMetrics
-      : nbackMetrics
-  const defaultMetricForSource = (trainer) => trainer === 'syllogimous' ? 'accuracy' : 'adjusted'
+      : trainer === 'ict'
+        ? ictMetrics
+        : nbackMetrics
+  const defaultMetricForSource = (trainer) => trainer === 'syllogimous' || trainer === 'ict' ? 'accuracy' : 'adjusted'
   const lifetimeCardDefinitions = {
     docct: { key: 'docct', label: 'DocCT' },
     rrt: { key: 'rrt', label: 'RRT' },
     quad: { key: 'quad', label: 'Quad N-back' },
     dual: { key: 'dual', label: 'Dual N-back' },
+    ict: { key: 'ict', label: 'ICT' },
   }
   const lifetimeKeysForSource = {
-    all: ['docct', 'rrt', 'quad', 'dual'],
+    all: ['docct', 'rrt', 'quad', 'dual', 'ict'],
     'quad-box': ['quad', 'dual'],
     docct: ['docct'],
     syllogimous: ['rrt'],
+    ict: ['ict'],
   }
 
   async function load() {
@@ -97,7 +102,7 @@
   }
   $: selectedProgressMode = progressModeOptions.find((option) => option.key === progressMode)
   $: progressSource = selectedProgressMode?.source
-    ?? (source === 'docct' || source === 'syllogimous' ? source : 'quad-box')
+    ?? (source === 'docct' || source === 'syllogimous' || source === 'ict' ? source : 'quad-box')
   $: if (progressSource !== progressMetricSource) {
     progressMetricSource = progressSource
     if (metric !== 'sessions') metric = defaultMetricForSource(progressSource)
@@ -217,6 +222,14 @@
   })
 
   const detailText = (session) => {
+    if (session.source === 'ict') {
+      const pace = session.raw.ict?.adaptive ? 'Adaptive' : 'Fixed pace'
+      const response = Number.isFinite(session.responseTimeMs) && session.responseTimeMs > 0
+        ? ` · ${Math.round(session.responseTimeMs)}ms response`
+        : ''
+      const endedEarly = session.raw.ict?.endedEarly ? ' · Ended early' : ''
+      return `${session.hits}/${session.possible} correct · ${pace}${response}${endedEarly}`
+    }
     if (session.source === 'docct') {
       const fastest = Number.isFinite(session.fastestIntervalMs) ? `${(session.fastestIntervalMs / 1000).toFixed(2)}s fastest` : 'No interval'
       const response = Number.isFinite(session.responseTimeMs) && session.responseTimeMs > 0 ? `${Math.round(session.responseTimeMs)}ms response` : 'No response time'
@@ -258,6 +271,7 @@
             <option value="quad-box">Quad Box</option>
             <option value="docct">DocCT</option>
             <option value="syllogimous">Syllogimous</option>
+            <option value="ict">ICT</option>
           </select>
         </label>
 
@@ -351,7 +365,7 @@
           <aside class="border-t border-base-300 pt-4 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0" aria-label="Lifetime totals">
             <h2 class="mb-3 text-sm font-semibold">Lifetime totals</h2>
             <div
-              class="grid gap-2 {lifetimeCards.length === 4 ? 'sm:grid-cols-4' : lifetimeCards.length === 2 ? 'sm:grid-cols-2' : 'grid-cols-1'}"
+              class="grid gap-2 {lifetimeCards.length === 5 ? 'sm:grid-cols-3 2xl:grid-cols-5' : lifetimeCards.length === 2 ? 'sm:grid-cols-2' : 'grid-cols-1'}"
               data-lifetime-grid
             >
               {#each lifetimeCards as card (card.key)}

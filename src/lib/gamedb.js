@@ -243,6 +243,86 @@ export async function addSyllogimousSession(session) {
   })
 }
 
+export async function addIctSession(session) {
+  const completedAt = new Date(session.completedAt)
+  const startedAt = new Date(session.startedAt)
+  const timestamp = completedAt.getTime()
+  const start = startedAt.getTime()
+  const modes = ['color', 'shape', 'letter', 'number', 'image', 'set', 'mixed', 'switch']
+  if (!Number.isFinite(timestamp) || !Number.isFinite(start) || start < 0 || start > timestamp) return false
+  if (timestamp > Date.UTC(2100, 0, 1) || typeof session.sessionId !== 'string' || !session.sessionId || session.sessionId.length > 256) return false
+  if (!modes.includes(session.mode)) return false
+  const completedTrials = session.totalAnswers
+  const hits = session.correctCount
+  if (!Number.isInteger(completedTrials) || completedTrials < 1 || completedTrials > 1_000_000) return false
+  if (!Number.isInteger(hits) || hits < 0 || hits > completedTrials) return false
+  const durationSec = session.durationSec
+  if (!Number.isFinite(durationSec) || durationSec < 0 || durationSec > 86_400 || durationSec > (timestamp - start) / 1000) return false
+  for (const key of ['startingWindowMs', 'minimumWindowMs', 'fastestIntervalMs', 'endingIntervalMs']) {
+    if (!Number.isFinite(session[key]) || session[key] < 1 || session[key] > 86_400_000) return false
+  }
+  if (!Number.isFinite(session.averageResponseTimeMs) || session.averageResponseTimeMs < 0 || session.averageResponseTimeMs > 86_400_000) return false
+  if (typeof session.adaptive !== 'boolean' || typeof session.endedEarly !== 'boolean') return false
+  if (session.adaptive && session.minimumWindowMs > session.startingWindowMs) return false
+
+  const record = {
+    sessionId: session.sessionId,
+    source: 'ict',
+    sourceSessionId: session.sessionId,
+    timestamp,
+    start,
+    status: 'completed',
+    title: `ict ${session.mode}`,
+    mode: 'ict',
+    variant: session.mode,
+    tags: ['answer'],
+    scores: { answer: { hits, misses: completedTrials - hits } },
+    completedTrials,
+    ict: {
+      sessionId: session.sessionId,
+      startedAt: startedAt.toISOString(),
+      completedAt: completedAt.toISOString(),
+      durationSec,
+      mode: session.mode,
+      adaptive: session.adaptive,
+      startingWindowMs: session.startingWindowMs,
+      minimumWindowMs: session.minimumWindowMs,
+      fastestIntervalMs: session.fastestIntervalMs,
+      endingIntervalMs: session.endingIntervalMs,
+      correctCount: hits,
+      totalAnswers: completedTrials,
+      averageResponseTimeMs: session.averageResponseTimeMs,
+      endedEarly: session.endedEarly,
+    },
+  }
+
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite')
+    const store = tx.objectStore(STORE_NAME)
+    const existing = store.index('source_session').getKey(['ict', session.sessionId])
+    let added = false
+    existing.onsuccess = () => {
+      if (existing.result === undefined) {
+        store.add(record)
+        added = true
+      }
+    }
+    tx.oncomplete = () => {
+      db.close()
+      resolve(added)
+    }
+    tx.onerror = () => {
+      db.close()
+      reject(tx.error)
+    }
+    tx.onabort = () => {
+      db.close()
+      reject(tx.error)
+    }
+  })
+}
+
 export async function getLastRecentGame() {
   const db = await openDB()
   const tx = db.transaction(STORE_NAME, "readonly")
@@ -475,7 +555,9 @@ const addScoreMetadata = (game) => {
   }
   game.source = game.source || 'quad-box'
   game.variant = game.variant || game.title || game.mode || 'unknown'
-  if ('start' in game) {
+  if (game.source === 'ict' && Number.isFinite(game.ict?.durationSec)) {
+    game.elapsedSeconds = Math.max(0, game.ict.durationSec)
+  } else if ('start' in game) {
     game.elapsedSeconds = (game.timestamp - game.start) / 1000
   } else {
     game.elapsedSeconds = game.trialTime * game.completedTrials / 1000
