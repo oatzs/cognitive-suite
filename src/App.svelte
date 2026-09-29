@@ -17,23 +17,27 @@ $: theme = $settings.theme === 'dark' ? 'black' : 'bumblebee'
 let view = 'quad-box'
 let docctActive = false
 let syllogimousActive = false
+let ictActive = false
 let renderedQuadMode = $settings.mode
 let optionalViewPromise = null
 const optionalViews = new Map()
 const optionalViewLoaders = {
   docct: () => import('./lib/docct/DocctApp.svelte'),
   syllogimous: () => import('./lib/syllogimous/SyllogimousApp.svelte'),
+  ict: () => import('./lib/ict/IctApp.svelte'),
   statistics: () => import('./lib/statistics/StatisticsPage.svelte'),
 }
-$: navigationLocked = $isPlaying || docctActive || syllogimousActive
+$: navigationLocked = $isPlaying || docctActive || syllogimousActive || ictActive
 $: if (!$isPlaying) renderedQuadMode = $settings.mode
 $: pageTitle = view === 'docct'
   ? 'DocCT'
   : view === 'syllogimous'
     ? 'Syllogimous'
-    : view === 'statistics'
-      ? 'Statistics'
-      : 'Quad Box'
+    : view === 'ict'
+      ? 'ICT'
+      : view === 'statistics'
+        ? 'Statistics'
+        : 'Quad Box'
 
 const navigate = (nextView) => {
   if (navigationLocked && nextView !== view) return
@@ -168,6 +172,14 @@ onDestroy(async () => {
         />
       {:catch reason}
         <div class="p-6 text-error">{reason?.message || 'Could not load Syllogimous'}</div>
+      {/await}
+    {:else if view === 'ict'}
+      {#await optionalViewPromise}
+        <div class="flex h-full items-center justify-center"><span class="loading loading-spinner loading-lg"></span></div>
+      {:then module}
+        <svelte:component this={module.default} onActiveChange={(active) => ictActive = active} />
+      {:catch reason}
+        <div class="p-6 text-error">{reason?.message || 'Could not load ICT'}</div>
       {/await}
     {:else}
       {#await optionalViewPromise}

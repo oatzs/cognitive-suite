@@ -91,3 +91,11 @@ chartjs-adapter-date-fns 3.0.0, and date-fns under their MIT licenses, plus
 d3-delaunay 6.0.4 under the ISC license. Their upstream projects are available
 at https://www.chartjs.org/, https://github.com/chartjs/chartjs-adapter-date-fns,
 https://date-fns.org/, and https://github.com/d3/d3-delaunay.
+
+## ICT
+
+This project includes a snapshot of Context-Dependent Inhibitory Control
+Training from https://ict-five-tau.vercel.app/, retrieved on September 29,
+2026. The published application did not identify a public source repository or
+include a license notice. The ICT files under `public/ict/` are not covered by
+Cognitive Suite's Unlicense.

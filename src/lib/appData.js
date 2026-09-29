@@ -1,6 +1,7 @@
 import { settings } from '../stores/settingsStore.js'
 import { deleteDB } from './gamedb.js'
 import { clearDocctPersistence } from './docct/persistence.js'
+import { clearIctPersistence } from './ict/persistence.js'
 import {
   clearSyllogimousStorage,
   deleteSyllogimousDatabase,
@@ -28,6 +29,7 @@ export function createAppDataRepository({
         throw new AggregateError(failures.map((failure) => failure.reason), message)
       }
       clearDocctPersistence(storage)
+      clearIctPersistence(storage)
       clearSyllogimousData(storage)
       resetQuadSettings()
     },

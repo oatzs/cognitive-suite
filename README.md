@@ -1,6 +1,6 @@
 # 🧠 Cognitive Suite
 
-Cognitive Suite combines Quad Box nback, DocCT, and Syllogimous relational reasoning training in one web app and desktop executable! These are mindbuilding exercises that can improve working memory, executive functioning, and fluid intelligence. Don't believe me? Check out some of the anecdotes on the mindbuilding server https://discord.gg/brain 
+Cognitive Suite combines Quad Box nback, DocCT, Syllogimous relational reasoning, and ICT inhibition training in one web app and desktop executable! These are mindbuilding exercises that can improve working memory, executive functioning, and fluid intelligence. Don't believe me? Check out some of the anecdotes on the mindbuilding server https://discord.gg/brain
 
 If you want to try it out online:
 
@@ -8,15 +8,15 @@ If you want to try it out online:
 
 ## QOL Improvements:
 
-- Simple navigation between Quad Box, DocCT, Syllogimous, and a shared Statistics page.
-- A combined history view for all three trainers, with filters for trainer, mode, and date range.
+- Simple navigation between Quad Box, DocCT, Syllogimous, ICT, and a shared Statistics page.
+- A combined history view for Quad Box, DocCT, and Syllogimous, with filters for trainer, mode, and date range.
 - Separate progress charts for Dual, Quad, Custom, DocCT, and Syllogimous modes, with only the measures that make sense for each trainer.
 - Daily session counts alongside training time, a 12-month activity heatmap, streak tracking, best scores, recent sessions, and per-modality accuracy. Training days roll over at 4:00 AM, so late-night sessions stay together.
 - JSON backup and restore for moving completed sessions between devices. Imports merge histories and skip duplicates instead of overwriting existing data. This means you can combine your training data from multiple devices onto one and get a full picture of your long term training data!
 - CSV exports if needed.
 - Offline desktop builds for Windows, macOS, and Linux.
 - Safer active sessions: settings and mode switching are locked once training starts, session settings stay fixed until the run ends, and repeated stop or navigation events cannot save the same session twice.
-- A full local-data reset that clears history, high scores, and settings from both trainers together.
+- A full local-data reset that clears history, high scores, and settings from every trainer together.
 
 Check out the mindbuilding discord, a great resource: https://discord.gg/brain
 
@@ -39,6 +39,12 @@ https://github.com/SafEight/docct
 https://soamsy.github.io/Syllogimous-v3/
 
 https://github.com/soamsy/Syllogimous-v3
+
+**ICT:**
+
+https://ict-five-tau.vercel.app/
+
+ICT stores its settings locally and can export completed results as JSON or CSV.
 
 ## Progress tracking
 
@@ -99,4 +105,5 @@ manually or when a `v*` tag is pushed.
 Original contributions to Cognitive Suite are released under the Unlicense.
 The incorporated Quad Box and DocCT code remains subject to their MIT licenses.
 Syllogimous remains subject to CC BY-NC 3.0 and may not be used commercially
-without separate permission. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+without separate permission. ICT is not covered by the Unlicense. See
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

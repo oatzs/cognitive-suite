@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createAppDataRepository } from '../src/lib/appData.js'
 import { DOCCT_STORAGE_KEYS } from '../src/lib/docct/persistence.js'
+import { ICT_STORAGE_KEYS } from '../src/lib/ict/persistence.js'
 import {
   SYLLOGIMOUS_STORAGE_KEYS,
   clearSyllogimousStorage,
@@ -8,7 +9,7 @@ import {
 
 describe('app data repository', () => {
   it('resets both databases, all trainer storage keys, and Quad Box settings', async () => {
-    const trainerStorageKeys = [...DOCCT_STORAGE_KEYS, ...SYLLOGIMOUS_STORAGE_KEYS]
+    const trainerStorageKeys = [...DOCCT_STORAGE_KEYS, ...ICT_STORAGE_KEYS, ...SYLLOGIMOUS_STORAGE_KEYS]
     const storageValues = new Map(trainerStorageKeys.map((key) => [key, 'saved']))
     storageValues.set('unrelated', 'keep')
     const storage = {
