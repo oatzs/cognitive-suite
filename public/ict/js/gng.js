@@ -492,7 +492,7 @@
         <div class="settings-grid">
           <label>Trials
             <select data-trials>
-              ${[100, 120, 160, 200].map(n => `<option value="${n}" ${c.trials === n ? 'selected' : ''}>${n}</option>`).join('')}
+              ${[100, 120, 160, 200, 300, 400].map(n => `<option value="${n}" ${c.trials === n ? 'selected' : ''}>${n}</option>`).join('')}
             </select>
           </label>
           <label class="check">
